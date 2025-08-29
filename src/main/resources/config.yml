@@ -1,0 +1,10 @@
+# maximum chunks a player's town can claim
+max-claims-per-player: 64
+
+# default town color (vanilla color names)
+default-color: GREEN
+
+# Dynmap marker style
+fill-opacity: 0.35
+line-opacity: 0.9
+line-weight: 2

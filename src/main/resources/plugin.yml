@@ -1,0 +1,76 @@
+name: VisualClaims
+main: com.example.visualclaims.VisualClaims
+version: 1.0.0
+api-version: 1.20
+depend: [dynmap]
+author: e1ixyz
+
+commands:
+  createtown:
+    description: Create a town
+    usage: /createtown <name>
+    permission: visclaims.createtown
+  deletetown:
+    description: Delete your town
+    usage: /deletetown
+    permission: visclaims.deletetown
+  claimchunk:
+    description: Claim the current chunk
+    usage: /claimchunk
+    permission: visclaims.claim
+  unclaim:
+    description: Unclaim the current chunk
+    usage: /unclaim
+    permission: visclaims.unclaim
+  autoclaim:
+    description: Toggle autoclaim for chunks
+    usage: /autoclaim
+    permission: visclaims.autoclaim
+  settownname:
+    description: Rename your town
+    usage: /settownname <name>
+    permission: visclaims.setname
+  settowncolor:
+    description: Set your town's color (vanilla color names)
+    usage: /settowncolor <color>
+    permission: visclaims.setcolor
+  claiminfo:
+    description: Show info about your town
+    usage: /claiminfo
+    permission: visclaims.claiminfo
+  claim:
+    description: Root command for claim help
+    usage: /claim help
+    permission: visclaims.help
+
+permissions:
+  visclaims.createtown:
+    description: Allows creating a town
+    default: true
+  visclaims.deletetown:
+    description: Allows deleting your town
+    default: true
+  visclaims.claim:
+    description: Allows claiming chunks
+    default: true
+  visclaims.unclaim:
+    description: Allows unclaiming chunks
+    default: true
+  visclaims.autoclaim:
+    description: Allows toggling autoclaim
+    default: true
+  visclaims.setname:
+    description: Allows renaming your town
+    default: true
+  visclaims.setcolor:
+    description: Allows changing your town color
+    default: true
+  visclaims.claiminfo:
+    description: Allows using /claiminfo to view your town details
+    default: true
+  visclaims.help:
+    description: Allows using /claim help to view all claim commands
+    default: true
+  visclaims.admin:
+    description: Bypass limits and manage towns for testing/admin purposes
+    default: op
