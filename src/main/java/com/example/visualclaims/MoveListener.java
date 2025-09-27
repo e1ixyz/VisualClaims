@@ -5,6 +5,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerTeleportEvent;
 
 import java.util.*;
 
@@ -28,36 +29,58 @@ public class MoveListener implements Listener {
     @EventHandler
     public void onMove(PlayerMoveEvent e) {
         if (e.getFrom() == null || e.getTo() == null) return;
-        if (e.getFrom().getChunk().equals(e.getTo().getChunk())) return;
-
-        Player p = e.getPlayer();
+        Chunk from = e.getFrom().getChunk();
         Chunk to = e.getTo().getChunk();
+        if (from.equals(to)) return;
+
+        handleChunkChange(e.getPlayer(), to);
+    }
+
+    @EventHandler
+    public void onTeleport(PlayerTeleportEvent e) {
+        if (e.isCancelled()) return;
+        if (e.getFrom() == null || e.getTo() == null) return;
+        Chunk from = e.getFrom().getChunk();
+        Chunk to = e.getTo().getChunk();
+        if (from.equals(to)) return;
+
+        handleChunkChange(e.getPlayer(), to);
+    }
+
+    private void handleChunkChange(Player p, Chunk to) {
         Optional<Town> atTown = townManager.getTownAt(to);
+        updateTownPresence(p, atTown);
+        handleAutoclaim(p, to, atTown);
+    }
+
+    private void updateTownPresence(Player p, Optional<Town> atTown) {
+        UUID uuid = p.getUniqueId();
         String nowTown = atTown.map(Town::getName).orElse(null);
-        String prevTown = lastTownAt.get(p.getUniqueId());
+        String prevTown = lastTownAt.get(uuid);
 
         if (!Objects.equals(prevTown, nowTown)) {
             if (nowTown != null) p.sendMessage("§7Now entering §a" + nowTown);
             if (prevTown != null && nowTown == null) p.sendMessage("§7Now leaving §c" + prevTown);
             if (prevTown != null && nowTown != null && !prevTown.equals(nowTown)) p.sendMessage("§7Now leaving §c" + prevTown);
-            lastTownAt.put(p.getUniqueId(), nowTown);
+            lastTownAt.put(uuid, nowTown);
         }
+    }
 
-        if (autoclaim.getOrDefault(p.getUniqueId(), false)) {
-            Optional<Town> townOpt = townManager.getTownByOwner(p.getUniqueId());
-            if (townOpt.isPresent() && atTown.isEmpty()) {
-                int max = plugin.getConfig().getInt("max-claims-per-player", 64);
-                boolean bypass = p.hasPermission("visclaims.admin");
-                boolean ok = townManager.claimChunk(p.getUniqueId(), to, max, bypass);
-                if (ok) {
-                    p.sendMessage("§aAuto-claimed chunk (" + to.getX() + ", " + to.getZ() + ")");
-                } else if (!bypass && townOpt.get().claimCount() >= max) {
-                    p.sendMessage("§cCannot auto-claim chunk: reached max of §e" + max + "§c chunks.");
-                } else if (townManager.getTownAt(to).isPresent()) {
-                    p.sendMessage("§cCannot auto-claim chunk: already claimed by another town.");
-                }
-            }
+    private void handleAutoclaim(Player p, Chunk to, Optional<Town> atTown) {
+        if (!autoclaim.getOrDefault(p.getUniqueId(), false)) return;
+
+        Optional<Town> townOpt = townManager.getTownByOwner(p.getUniqueId());
+        if (townOpt.isEmpty() || atTown.isPresent()) return;
+
+        int max = plugin.getConfig().getInt("max-claims-per-player", 64);
+        boolean bypass = p.hasPermission("visclaims.admin");
+        boolean ok = townManager.claimChunk(p.getUniqueId(), to, max, bypass);
+        if (ok) {
+            p.sendMessage("§aAuto-claimed chunk (" + to.getX() + ", " + to.getZ() + ")");
+        } else if (!bypass && townOpt.get().claimCount() >= max) {
+            p.sendMessage("§cCannot auto-claim chunk: reached max of §e" + max + "§c chunks.");
+        } else if (townManager.getTownAt(to).isPresent()) {
+            p.sendMessage("§cCannot auto-claim chunk: already claimed by another town.");
         }
-
     }
 }
