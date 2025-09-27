@@ -1,6 +1,6 @@
 ## VisualClaims
 
-VisualClaims is a Paper/Spigot plugin that lets players found towns, visually claim chunks (no block protection), and see their borders rendered live on Dynmap. It combines lightweight gameplay commands with persistent storage and colourful map overlays so servers can offer simple land protection without heavy setup.
+VisualClaims is a Paper/Spigot plugin that lets players found towns, visually claim chunks (no block protection), and see their borders rendered live on Dynmap. It combines lightweight gameplay commands with persistent storage and colourful map overlays so servers can offer simple land visualization without heavy setup.
 
 ### Highlights
 - Found a personal town, claim/unclaim chunks manually, or enable autoclaim while exploring.
