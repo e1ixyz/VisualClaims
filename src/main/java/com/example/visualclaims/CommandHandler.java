@@ -37,6 +37,8 @@ public class CommandHandler implements CommandExecutor {
             case "settowncolor": return setTownColor(p, args);
             case "claiminfo": return claimInfo(p);
             case "claim": return claimHelp(p, args);
+            case "claimlimit": return claimLimit(p, args);
+            case "adjustclaims": return adjustClaims(p, args);
             default: return false;
         }
     }
@@ -85,15 +87,15 @@ public class CommandHandler implements CommandExecutor {
             return true;
         }
         Chunk c = p.getLocation().getChunk();
-        int max = plugin.getConfig().getInt("max-claims-per-player", 64);
         boolean bypass = p.hasPermission("visclaims.admin");
-        boolean ok = towns.claimChunk(uuid, c, max, bypass);
+        int max = towns.computeMaxClaims(uuid);
+        boolean ok = towns.claimChunk(uuid, c, bypass);
         if (ok) {
             p.sendMessage("§aClaimed chunk at §e(" + c.getX() + ", " + c.getZ() + ")");
         } else {
             Optional<Town> other = towns.getTownAt(c);
             if (other.isPresent()) p.sendMessage("§cChunk already claimed by §e" + other.get().getName());
-            else p.sendMessage("§cCannot claim chunk: limit reached.");
+            else p.sendMessage("§cCannot claim chunk: limit reached (§e" + max + "§c).");
         }
         return true;
     }
@@ -204,6 +206,91 @@ public class CommandHandler implements CommandExecutor {
         return true;
     }
 
+    private boolean claimLimit(Player p, String[] args) {
+        boolean isAdmin = p.hasPermission("visclaims.admin");
+        UUID targetId = p.getUniqueId();
+        String targetName = p.getName();
+
+        if (args.length == 1) {
+            if (!isAdmin) {
+                p.sendMessage("§cNo permission to check others.");
+                return true;
+            }
+            var offline = plugin.getServer().getOfflinePlayer(args[0]);
+            targetId = offline.getUniqueId();
+            targetName = offline.getName() != null ? offline.getName() : args[0];
+        } else if (args.length > 1) {
+            p.sendMessage("Usage: /claimlimit [player]");
+            return true;
+        }
+
+        Optional<Town> townOpt = towns.getTownByOwner(targetId);
+        if (townOpt.isEmpty()) {
+            p.sendMessage("§cThat player does not own a town.");
+            return true;
+        }
+
+        int playtimeHours = towns.getPlaytimeHours(targetId);
+        int limit = towns.computeMaxClaims(targetId);
+        int claimed = townOpt.get().claimCount();
+        int bonus = townOpt.get().getBonusChunks();
+        int chunksPerHour = Math.max(1, plugin.getConfig().getInt("chunks-per-hour", 2));
+        boolean usingPlaytime = plugin.getConfig().getBoolean("use-playtime-scaling", false);
+        int baseMax = plugin.getConfig().getInt("max-claims-per-player", 64);
+
+        p.sendMessage("§e--- Claim Limit for " + targetName + " ---");
+        p.sendMessage("§7Claims: §f" + claimed + " §7/ Limit: §f" + limit);
+        p.sendMessage("§7Bonus chunks: §f" + bonus);
+        if (usingPlaytime) {
+            p.sendMessage("§7Playtime: §f" + playtimeHours + "h §7at §f" + chunksPerHour + " chunks/hour");
+            p.sendMessage("§7Base cap (min): §f" + baseMax);
+        } else {
+            p.sendMessage("§7Playtime scaling: §cdisabled §7(Base cap: §f" + baseMax + "§7)");
+        }
+        return true;
+    }
+
+    private boolean adjustClaims(Player p, String[] args) {
+        if (!p.hasPermission("visclaims.admin")) {
+            p.sendMessage("§cNo permission.");
+            return true;
+        }
+        if (args.length != 3) {
+            p.sendMessage("Usage: /adjustclaims <player> <add|remove> <amount>");
+            return true;
+        }
+        var offline = plugin.getServer().getOfflinePlayer(args[0]);
+        UUID targetId = offline.getUniqueId();
+        String mode = args[1].toLowerCase(Locale.ROOT);
+        int amount;
+        try {
+            amount = Integer.parseInt(args[2]);
+        } catch (NumberFormatException ex) {
+            p.sendMessage("§cAmount must be a number.");
+            return true;
+        }
+        if (amount < 0) {
+            p.sendMessage("§cAmount must be positive.");
+            return true;
+        }
+        int delta = mode.equals("add") ? amount : mode.equals("remove") ? -amount : 0;
+        if (delta == 0) {
+            p.sendMessage("§cMode must be add or remove.");
+            return true;
+        }
+        boolean ok = towns.adjustBonus(targetId, delta);
+        if (!ok) {
+            p.sendMessage("§cThat player does not own a town.");
+            return true;
+        }
+        Optional<Town> tOpt = towns.getTownByOwner(targetId);
+        int newBonus = tOpt.map(Town::getBonusChunks).orElse(0);
+        int newLimit = towns.computeMaxClaims(targetId);
+        String name = offline.getName() != null ? offline.getName() : args[0];
+        p.sendMessage("§aUpdated bonus for §e" + name + "§a to §e" + newBonus + "§a. New limit: §e" + newLimit);
+        return true;
+    }
+
     private boolean claimHelp(Player p, String[] args) {
         if (!p.hasPermission("visclaims.help")) {
             p.sendMessage("§cNo permission.");
@@ -222,6 +309,8 @@ public class CommandHandler implements CommandExecutor {
         p.sendMessage("§f/settownname <name> §7- Rename your town");
         p.sendMessage("§f/settowncolor <color> §7- Change your town's color");
         p.sendMessage("§f/claiminfo §7- Show info about your town");
+        p.sendMessage("§f/claimlimit [player] §7- Show playtime-based claim limits");
+        p.sendMessage("§f/adjustclaims <player> <add|remove> <amount> §7- Admin bonus claims");
         p.sendMessage("§f/claim help §7- Show this help message");
         return true;
     }

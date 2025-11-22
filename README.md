@@ -7,6 +7,7 @@ VisualClaims is a Paper/Spigot plugin that lets players found towns, visually cl
 - Sync every claim to Dynmap with custom colours, configurable line weight, and fill opacity.
 - Store towns as JSON on disk for safe restarts and easy editing.
 - Simple permission scheme with an admin bypass for moderators and test servers.
+- (Experimental) Playtime-based claim caps with `/claimlimit` visibility and admin bonuses.
 
 ### Requirements
 - Java 17 or newer.
@@ -38,6 +39,10 @@ The config file lives at `plugins/VisualClaims/config.yml` after first launch:
 # maximum chunks a player's town can claim
 max-claims-per-player: 64
 
+# award chunks based on playtime (Statistic.PLAY_ONE_MINUTE); existing claims are never revoked
+use-playtime-scaling: false
+chunks-per-hour: 2
+
 # default town color (vanilla color names)
 default-color: GREEN
 
@@ -48,6 +53,8 @@ line-weight: 2
 ```
 
 - `max-claims-per-player`: Hard cap on chunks per town; admins with `visclaims.admin` bypass it.
+- `use-playtime-scaling`: When true, the claim cap scales with playtime (2 chunks/hour by default). The cap will never force-unclaim existing land.
+- `chunks-per-hour`: Chunk allowance per played hour when playtime scaling is enabled.
 - `default-color`: Applied to newly created towns; value must match a vanilla chat colour name.
 - Marker style keys tweak the appearance of the Dynmap polygons.
 - Restart the server (or reload VisualClaims) after editing the config to apply changes.
@@ -63,9 +70,13 @@ line-weight: 2
 | `/settownname <name>` | Rename your town. | `visclaims.setname` | true |
 | `/settowncolor <color>` | Change the town colour (see list below). | `visclaims.setcolor` | true |
 | `/claiminfo` | Display your town's stats. | `visclaims.claiminfo` | true |
+| `/claimlimit [player]` | Show the current claim limit, playtime hours, and bonuses. Admins can target others. | `visclaims.claimlimit` | true |
+| `/adjustclaims <player> <add|remove> <amount>` | Admin: add or subtract bonus claim slots for a player. | `visclaims.admin` | op |
 | `/claim help` | Show the quick reference help. | `visclaims.help` | true |
 
 `visclaims.admin` grants moderators the ability to bypass claim limits and force-unclaim land owned by other towns.
+
+Playtime scaling reads the built-in `Statistic.PLAY_ONE_MINUTE` (same counter used by EssentialsX `/playtime`) and grants `chunks-per-hour` claims per played hour. Existing claims are never revoked if the cap drops; the player simply cannot claim more until their allowance grows.
 
 ### Supported Colours
 `VanillaColor` covers the standard Minecraft chat colour names: `BLACK`, `DARK_BLUE`, `DARK_GREEN`, `DARK_AQUA`, `DARK_RED`, `DARK_PURPLE`, `GOLD`, `GRAY`, `DARK_GRAY`, `BLUE`, `GREEN`, `AQUA`, `RED`, `LIGHT_PURPLE`, `YELLOW`, `WHITE`.

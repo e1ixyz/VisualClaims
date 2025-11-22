@@ -48,7 +48,7 @@
             <artifactId>dynmap-api</artifactId>
             <version>3.7-beta-10</version>
             <scope>system</scope>
-            <systemPath>/Users/elimcgehee/Desktop/VisualClaims/libs/Dynmap-3.7-beta-10-spigot.jar</systemPath>
+            <systemPath>${project.basedir}/libs/Dynmap-3.7-beta-10-spigot.jar</systemPath>
         </dependency>
     </dependencies>
 

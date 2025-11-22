@@ -38,6 +38,8 @@ public class VisualClaims extends JavaPlugin {
         getCommand("settowncolor").setExecutor(handler);
         getCommand("claiminfo").setExecutor(handler);     // ✅ Added
         getCommand("claim").setExecutor(handler);         // ✅ Added (claim help)
+        getCommand("claimlimit").setExecutor(handler);    // Experimental limit/info
+        getCommand("adjustclaims").setExecutor(handler);  // Admin bonus adjustments
 
         // Move listener
         moveListener = new MoveListener(this, townManager);

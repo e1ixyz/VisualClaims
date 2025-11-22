@@ -6,6 +6,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 
 import java.util.*;
 
@@ -14,6 +15,7 @@ public class MoveListener implements Listener {
     private final TownManager townManager;
     private final Map<UUID, Boolean> autoclaim = new HashMap<>();
     private final Map<UUID, String> lastTownAt = new HashMap<>();
+    private final Map<UUID, String> lastChunkId = new HashMap<>();
 
     public MoveListener(VisualClaims plugin, TownManager townManager) {
         this.plugin = plugin;
@@ -28,6 +30,7 @@ public class MoveListener implements Listener {
 
     @EventHandler
     public void onMove(PlayerMoveEvent e) {
+        if (e.isCancelled()) return;
         if (e.getFrom() == null || e.getTo() == null) return;
         Chunk from = e.getFrom().getChunk();
         Chunk to = e.getTo().getChunk();
@@ -47,7 +50,19 @@ public class MoveListener implements Listener {
         handleChunkChange(e.getPlayer(), to);
     }
 
+    @EventHandler
+    public void onQuit(PlayerQuitEvent e) {
+        UUID id = e.getPlayer().getUniqueId();
+        autoclaim.remove(id);
+        lastTownAt.remove(id);
+        lastChunkId.remove(id);
+    }
+
     private void handleChunkChange(Player p, Chunk to) {
+        String id = new ChunkPos(to.getWorld().getName(), to.getX(), to.getZ()).id();
+        if (id.equals(lastChunkId.get(p.getUniqueId()))) return;
+
+        lastChunkId.put(p.getUniqueId(), id);
         Optional<Town> atTown = townManager.getTownAt(to);
         updateTownPresence(p, atTown);
         handleAutoclaim(p, to, atTown);
@@ -72,9 +87,9 @@ public class MoveListener implements Listener {
         Optional<Town> townOpt = townManager.getTownByOwner(p.getUniqueId());
         if (townOpt.isEmpty() || atTown.isPresent()) return;
 
-        int max = plugin.getConfig().getInt("max-claims-per-player", 64);
+        int max = townManager.computeMaxClaims(p.getUniqueId());
         boolean bypass = p.hasPermission("visclaims.admin");
-        boolean ok = townManager.claimChunk(p.getUniqueId(), to, max, bypass);
+        boolean ok = townManager.claimChunk(p.getUniqueId(), to, bypass);
         if (ok) {
             p.sendMessage("§aAuto-claimed chunk (" + to.getX() + ", " + to.getZ() + ")");
         } else if (!bypass && townOpt.get().claimCount() >= max) {

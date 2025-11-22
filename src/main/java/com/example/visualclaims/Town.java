@@ -12,6 +12,7 @@ public class Town {
     private String world;
     private String colorName; // vanilla enum name
     private Set<ChunkPos> claims = new HashSet<>();
+    private int bonusChunks = 0; // manual adjustments
 
     // For Gson
     public Town() {}
@@ -30,6 +31,9 @@ public class Town {
     public VanillaColor getColor() { return VanillaColor.fromString(colorName); }
     public void setColor(VanillaColor c) { this.colorName = c.name(); }
     public String getColorName() { return colorName; }
+    public int getBonusChunks() { return bonusChunks; }
+    public void addBonusChunks(int delta) { this.bonusChunks += delta; }
+    public void setBonusChunks(int bonusChunks) { this.bonusChunks = bonusChunks; }
 
     public Set<ChunkPos> getClaims() { return claims; }
 

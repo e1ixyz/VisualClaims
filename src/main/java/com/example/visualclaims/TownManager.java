@@ -2,7 +2,10 @@ package com.example.visualclaims;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
+import org.bukkit.OfflinePlayer;
+import org.bukkit.Statistic;
 
 import java.io.File;
 import java.io.FileReader;
@@ -53,10 +56,10 @@ public class TownManager {
         return true;
     }
 
-    public boolean claimChunk(UUID owner, Chunk chunk, int maxClaims, boolean bypass) {
+    public boolean claimChunk(UUID owner, Chunk chunk, boolean bypass) {
         Town t = townsByOwner.get(owner);
         if (t == null) return false;
-        if (!bypass && t.claimCount() >= maxClaims) return false;
+        if (!bypass && t.claimCount() >= computeMaxClaims(owner)) return false;
         ChunkPos pos = ChunkPos.of(chunk);
         if (townsByChunkId.containsKey(pos.id())) return false;
         boolean ok = t.addClaim(pos);
@@ -85,10 +88,48 @@ public class TownManager {
         if (t != null) {
             t.removeClaim(pos);
             saveTown(t);
-            if (dynmap != null) dynmap.refreshTownAreas(t);
+            if (dynmap != null) dynmap.removeAreaMarker(pos);
             return true;
         }
         return false;
+    }
+
+    public int computeMaxClaims(UUID owner) {
+        int baseMax = plugin.getConfig().getInt("max-claims-per-player", 64);
+        Town t = townsByOwner.get(owner);
+        int bonus = (t != null) ? t.getBonusChunks() : 0;
+
+        if (!plugin.getConfig().getBoolean("use-playtime-scaling", false)) {
+            return Math.max(baseMax + bonus, t != null ? t.claimCount() : 0);
+        }
+
+        int chunksPerHour = Math.max(1, plugin.getConfig().getInt("chunks-per-hour", 2));
+        int hours = getPlaytimeHours(owner);
+        int dynamic = hours * chunksPerHour;
+
+        int limit = Math.max(baseMax, dynamic) + bonus;
+        int currentClaims = (t != null) ? t.claimCount() : 0;
+        return Math.max(limit, currentClaims);
+    }
+
+    public int getPlaytimeHours(UUID owner) {
+        OfflinePlayer op = Bukkit.getOfflinePlayer(owner);
+        int ticks = 0;
+        try {
+            ticks = op.getStatistic(Statistic.PLAY_ONE_MINUTE);
+        } catch (IllegalArgumentException ignored) {
+            // Offline player without data; leave at zero.
+        }
+        long totalSeconds = (long) ticks / 20L;
+        return (int) (totalSeconds / 3600L);
+    }
+
+    public boolean adjustBonus(UUID owner, int delta) {
+        Town t = townsByOwner.get(owner);
+        if (t == null) return false;
+        t.addBonusChunks(delta);
+        saveTown(t);
+        return true;
     }
 
     public void saveTown(Town t) {

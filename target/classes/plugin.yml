@@ -42,6 +42,14 @@ commands:
     description: Root command for claim help
     usage: /claim help
     permission: visclaims.help
+  claimlimit:
+    description: Show playtime-based claim limit
+    usage: /claimlimit [player]
+    permission: visclaims.claimlimit
+  adjustclaims:
+    description: Admin: add or remove bonus claim slots
+    usage: /adjustclaims <player> <add|remove> <amount>
+    permission: visclaims.admin
 
 permissions:
   visclaims.createtown:
@@ -70,6 +78,9 @@ permissions:
     default: true
   visclaims.help:
     description: Allows using /claim help to view all claim commands
+    default: true
+  visclaims.claimlimit:
+    description: Allows using /claimlimit to view claim limits (admins can target others)
     default: true
   visclaims.admin:
     description: Bypass limits and manage towns for testing/admin purposes
