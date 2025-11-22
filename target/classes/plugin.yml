@@ -47,7 +47,7 @@ commands:
     usage: /claimlimit [player]
     permission: visclaims.claimlimit
   adjustclaims:
-    description: Admin: add or remove bonus claim slots
+    description: "Admin: add or remove bonus claim slots"
     usage: /adjustclaims <player> <add|remove> <amount>
     permission: visclaims.admin
 
