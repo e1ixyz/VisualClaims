@@ -1,10 +1,14 @@
 ## VisualClaims
 
-VisualClaims is a Paper/Spigot plugin that lets players found towns, visually claim chunks (no block protection), and see their borders rendered live on Dynmap. It combines lightweight gameplay commands with persistent storage and colourful map overlays so servers can offer simple land visualization without heavy setup.
+VisualClaims is a Paper/Spigot plugin that lets players found towns, invite friends, visually claim chunks (no block protection), and see their borders rendered live on Dynmap. It combines lightweight gameplay commands with persistent storage and colourful map overlays so servers can offer simple land visualization without heavy setup.
 
 ### Highlights
-- Found a personal town, claim/unclaim chunks manually, or enable autoclaim while exploring.
+- Found a town, invite/join friends, view members, and manage alliances or wars between towns.
+- Claim/unclaim chunks manually or enable autoclaim and autohistory while exploring.
 - Sync every claim to Dynmap with custom colours, configurable line weight, and fill opacity.
+- Public town listings show descriptions, members, alliances, wars, and claim counts.
+- Chunk history keeps a log of who claimed a spot and what alliances/wars were active at the time.
+- Territory entry notifications alert town members/owners when someone enters their land.
 - Store towns as JSON on disk for safe restarts and easy editing.
 - Simple permission scheme with an admin bypass for moderators and test servers.
 - (Experimental) Playtime-based claim caps with `/claimlimit` visibility and admin bonuses.
@@ -67,12 +71,23 @@ line-weight: 2
 | `/claimchunk` | Claim the chunk you are standing in. | `visclaims.claim` | true |
 | `/unclaim` | Unclaim the current chunk (admins can force-unclaim). | `visclaims.unclaim` | true |
 | `/autoclaim` | Toggle automatic claiming while you walk. | `visclaims.autoclaim` | true |
+| `/autohistory` | Toggle automatic chunk history popups while you walk. | `visclaims.autohistory` | true |
 | `/settownname <name>` | Rename your town. | `visclaims.setname` | true |
 | `/settowncolor <color>` | Change the town colour (see list below). | `visclaims.setcolor` | true |
-| `/claiminfo` | Display your town's stats. | `visclaims.claiminfo` | true |
+| `/settowndesc <text>` | Set your town description. | `visclaims.setdesc` | true |
+| `/claiminfo` | Display your town's stats, members, allies, wars. | `visclaims.claiminfo` | true |
 | `/claimlimit [player]` | Show the current claim limit, playtime hours, and bonuses. Admins can target others. | `visclaims.claimlimit` | true |
+| `/claimhistory` | Show recent claim history for the current chunk. | `visclaims.history` | true |
+| `/towninvite <player>` | Invite a player to your town. | `visclaims.invite` | true |
+| `/jointown <town>` | Accept a town invitation. | `visclaims.join` | true |
+| `/townmembers` | List members in your town (owner only). | `visclaims.members` | true |
+| `/removemember <player>` | Remove a member from your town (owner only). | `visclaims.kick` | true |
+| `/towns` | Public list of all towns, descriptions, and members. | `visclaims.towns` | true |
+| `/towninfo <town>` | Public details for a specific town. | `visclaims.towninfo` | true |
+| `/war <town>` | Declare/resolve war with another town (owner only). | `visclaims.war` | true |
+| `/alliance <town>|accept <town>|remove <town>` | Manage alliances (owner only). | `visclaims.alliance` | true |
+| `/claim` | Show the quick reference help. | `visclaims.help` | true |
 | `/adjustclaims <player> <add|remove> <amount>` | Admin: add or subtract bonus claim slots for a player. | `visclaims.admin` | op |
-| `/claim help` | Show the quick reference help. | `visclaims.help` | true |
 
 `visclaims.admin` grants moderators the ability to bypass claim limits and force-unclaim land owned by other towns.
 

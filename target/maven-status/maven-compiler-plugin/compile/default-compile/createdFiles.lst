@@ -1,7 +1,5 @@
 com/example/visualclaims/VisualClaims.class
-com/example/visualclaims/MoveListener.class
 com/example/visualclaims/Town.class
-com/example/visualclaims/CommandHandler.class
 com/example/visualclaims/ChunkPos.class
 com/example/visualclaims/TownManager.class
 com/example/visualclaims/VanillaColor.class

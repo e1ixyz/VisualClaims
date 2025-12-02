@@ -36,10 +36,21 @@ public class VisualClaims extends JavaPlugin {
         getCommand("autoclaim").setExecutor(handler);
         getCommand("settownname").setExecutor(handler);
         getCommand("settowncolor").setExecutor(handler);
+        getCommand("settowndesc").setExecutor(handler);
         getCommand("claiminfo").setExecutor(handler);     // ✅ Added
+        getCommand("claimhistory").setExecutor(handler);
         getCommand("claim").setExecutor(handler);         // ✅ Added (claim help)
         getCommand("claimlimit").setExecutor(handler);    // Experimental limit/info
         getCommand("adjustclaims").setExecutor(handler);  // Admin bonus adjustments
+        getCommand("towninvite").setExecutor(handler);
+        getCommand("jointown").setExecutor(handler);
+        getCommand("townmembers").setExecutor(handler);
+        getCommand("removemember").setExecutor(handler);
+        getCommand("towns").setExecutor(handler);
+        getCommand("towninfo").setExecutor(handler);
+        getCommand("autohistory").setExecutor(handler);
+        getCommand("war").setExecutor(handler);
+        getCommand("alliance").setExecutor(handler);
 
         // Move listener
         moveListener = new MoveListener(this, townManager);

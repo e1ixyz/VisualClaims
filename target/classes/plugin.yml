@@ -34,10 +34,18 @@ commands:
     description: Set your town's color (vanilla color names)
     usage: /settowncolor <color>
     permission: visclaims.setcolor
+  settowndesc:
+    description: Set your town description
+    usage: /settowndesc <text>
+    permission: visclaims.setdesc
   claiminfo:
     description: Show info about your town
     usage: /claiminfo
     permission: visclaims.claiminfo
+  claimhistory:
+    description: Show claim history for the current chunk
+    usage: /claimhistory
+    permission: visclaims.history
   claim:
     description: Root command for claim help
     usage: /claim help
@@ -50,6 +58,42 @@ commands:
     description: "Admin: add or remove bonus claim slots"
     usage: /adjustclaims <player> <add|remove> <amount>
     permission: visclaims.admin
+  towninvite:
+    description: Invite a player to your town
+    usage: /towninvite <player>
+    permission: visclaims.invite
+  jointown:
+    description: Accept a town invitation
+    usage: /jointown <town>
+    permission: visclaims.join
+  townmembers:
+    description: Show members in your town
+    usage: /townmembers
+    permission: visclaims.members
+  removemember:
+    description: Remove a member from your town
+    usage: /removemember <player>
+    permission: visclaims.kick
+  towns:
+    description: Public listing of towns
+    usage: /towns
+    permission: visclaims.towns
+  towninfo:
+    description: Public town details
+    usage: /towninfo <town>
+    permission: visclaims.towninfo
+  autohistory:
+    description: Toggle automatic chunk history feed
+    usage: /autohistory
+    permission: visclaims.autohistory
+  war:
+    description: Declare or resolve war with another town
+    usage: /war <town>
+    permission: visclaims.war
+  alliance:
+    description: Manage alliances with other towns
+    usage: /alliance <town>|accept <town>|remove <town>
+    permission: visclaims.alliance
 
 permissions:
   visclaims.createtown:
@@ -73,14 +117,47 @@ permissions:
   visclaims.setcolor:
     description: Allows changing your town color
     default: true
+  visclaims.setdesc:
+    description: Allows setting your town description
+    default: true
   visclaims.claiminfo:
     description: Allows using /claiminfo to view your town details
+    default: true
+  visclaims.history:
+    description: Allows using /claimhistory to view chunk history
     default: true
   visclaims.help:
     description: Allows using /claim help to view all claim commands
     default: true
   visclaims.claimlimit:
     description: Allows using /claimlimit to view claim limits (admins can target others)
+    default: true
+  visclaims.invite:
+    description: Allows inviting players to a town
+    default: true
+  visclaims.join:
+    description: Allows accepting a town invitation
+    default: true
+  visclaims.members:
+    description: Allows viewing members in your town
+    default: true
+  visclaims.kick:
+    description: Allows removing members from your town
+    default: true
+  visclaims.towns:
+    description: Allows viewing the public town list
+    default: true
+  visclaims.towninfo:
+    description: Allows viewing public town information
+    default: true
+  visclaims.autohistory:
+    description: Allows toggling autohistory
+    default: true
+  visclaims.war:
+    description: Allows declaring war with other towns (owners only)
+    default: true
+  visclaims.alliance:
+    description: Allows managing alliances (owners only)
     default: true
   visclaims.admin:
     description: Bypass limits and manage towns for testing/admin purposes
