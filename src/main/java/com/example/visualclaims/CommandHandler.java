@@ -5,6 +5,9 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import net.md_5.bungee.api.chat.ClickEvent;
+import net.md_5.bungee.api.chat.TextComponent;
+import net.md_5.bungee.api.ChatColor;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -55,6 +58,9 @@ public class CommandHandler implements CommandExecutor {
             case "towninfo": return townInfo(p, args);
             case "war": return warCommand(p, args);
             case "alliance": return allianceCommand(p, args);
+            case "warmode": return warModeAdmin(p, args);
+            case "warscoreboard": return toggleWarScoreboard(p);
+            case "claimadmin": return claimAdminHelp(p, args);
             default: return false;
         }
     }
@@ -499,11 +505,17 @@ public class CommandHandler implements CommandExecutor {
         }
         p.sendMessage("§e--- Towns ---");
         for (Town t : towns.allTowns()) {
-            String owner = plugin.getServer().getOfflinePlayer(t.getOwner()).getName();
-            List<String> members = resolveNames(t.getMembers());
-            p.sendMessage("§f" + t.getName() + " §7(Owner: §f" + (owner != null ? owner : t.getOwner()) + "§7)");
-            p.sendMessage("§7Desc: §f" + t.getDescription());
-            p.sendMessage("§7Members: §f" + (members.isEmpty() ? "none" : String.join(", ", members)));
+            TextComponent line = new TextComponent(" - ");
+            ChatColor color = towns.toChatColor(t.getColor());
+            TextComponent name = new TextComponent(t.getName());
+            if (color != null) name.setColor(color);
+            TextComponent info = new TextComponent(" [Info]");
+            info.setColor(ChatColor.YELLOW);
+            info.setBold(true);
+            info.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/towninfo " + t.getName()));
+            line.addExtra(name);
+            line.addExtra(info);
+            p.spigot().sendMessage(line);
         }
         return true;
     }
@@ -576,6 +588,10 @@ public class CommandHandler implements CommandExecutor {
             p.sendMessage("§cNo permission.");
             return true;
         }
+        if (!towns.isWarModeEnabled()) {
+            p.sendMessage("§cWar mode is currently disabled by admins.");
+            return true;
+        }
         Optional<Town> myTownOpt = towns.getTownByOwner(p.getUniqueId());
         if (myTownOpt.isEmpty()) {
             p.sendMessage("§cOnly town owners can manage wars.");
@@ -615,6 +631,10 @@ public class CommandHandler implements CommandExecutor {
     private boolean allianceCommand(Player p, String[] args) {
         if (!p.hasPermission("visclaims.alliance")) {
             p.sendMessage("§cNo permission.");
+            return true;
+        }
+        if (!towns.isWarModeEnabled()) {
+            p.sendMessage("§cAlliances and wars are disabled until war mode is enabled by an admin.");
             return true;
         }
         Optional<Town> myTownOpt = towns.getTownByOwner(p.getUniqueId());
@@ -685,6 +705,45 @@ public class CommandHandler implements CommandExecutor {
         }
         p.sendMessage("§aAlliance invite sent to §e" + other.getName());
         towns.messageTown(other, "§a" + myTown.getName() + " §7has invited you to form an alliance. Owner can use §e/alliance accept " + myTown.getName() + " §7to accept.");
+        return true;
+    }
+
+    private boolean warModeAdmin(Player p, String[] args) {
+        if (!p.hasPermission("visclaims.warmode")) {
+            p.sendMessage("§cNo permission.");
+            return true;
+        }
+        if (args.length != 1 || !(args[0].equalsIgnoreCase("on") || args[0].equalsIgnoreCase("off"))) {
+            p.sendMessage("Usage: /warmode <on|off>");
+            return true;
+        }
+        boolean enable = args[0].equalsIgnoreCase("on");
+        towns.setWarModeEnabled(enable);
+        p.sendMessage(enable ? "§cWar mode enabled. War commands and scoreboards are now active." : "§aWar mode disabled. Scoreboards reset.");
+        return true;
+    }
+
+    private boolean toggleWarScoreboard(Player p) {
+        if (!p.hasPermission("visclaims.warscoreboard")) {
+            p.sendMessage("§cNo permission.");
+            return true;
+        }
+        boolean enabled = towns.toggleScoreboard(p.getUniqueId());
+        if (towns.isWarModeEnabled() && enabled) towns.applyScoreboard(p);
+        p.sendMessage(enabled ? "§aWar scoreboard enabled." : "§cWar scoreboard disabled.");
+        return true;
+    }
+
+    private boolean claimAdminHelp(Player p, String[] args) {
+        if (!p.hasPermission("visclaims.adminhelp")) {
+            p.sendMessage("§cNo permission.");
+            return true;
+        }
+        p.sendMessage("§c--- Admin Claim Commands ---");
+        p.sendMessage("§f/adjustclaims <player> <add|remove> <amount> §7- Modify bonus claims");
+        p.sendMessage("§f/warmode <on|off> §7- Toggle global war mode & scoreboards");
+        p.sendMessage("§f/warscoreboard §7- Toggle your war scoreboard view");
+        p.sendMessage("§f/unclaim (with visclaims.admin) §7- Force unclaim any chunk");
         return true;
     }
 

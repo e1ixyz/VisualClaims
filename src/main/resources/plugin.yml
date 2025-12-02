@@ -94,6 +94,18 @@ commands:
     description: Manage alliances with other towns
     usage: /alliance <town>|accept <town>|remove <town>
     permission: visclaims.alliance
+  warmode:
+    description: Admin: toggle global war mode and scoreboards
+    usage: /warmode <on|off>
+    permission: visclaims.warmode
+  warscoreboard:
+    description: Toggle your war scoreboard view
+    usage: /warscoreboard
+    permission: visclaims.warscoreboard
+  claimadmin:
+    description: Show admin-only claim commands
+    usage: /claimadmin
+    permission: visclaims.adminhelp
 
 permissions:
   visclaims.createtown:
@@ -159,6 +171,15 @@ permissions:
   visclaims.alliance:
     description: Allows managing alliances (owners only)
     default: true
+  visclaims.warmode:
+    description: Allows toggling global war mode
+    default: op
+  visclaims.warscoreboard:
+    description: Allows toggling personal war scoreboard
+    default: true
+  visclaims.adminhelp:
+    description: Allows viewing admin claim help
+    default: op
   visclaims.admin:
     description: Bypass limits and manage towns for testing/admin purposes
     default: op

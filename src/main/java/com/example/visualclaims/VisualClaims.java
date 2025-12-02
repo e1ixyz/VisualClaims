@@ -51,6 +51,9 @@ public class VisualClaims extends JavaPlugin {
         getCommand("autohistory").setExecutor(handler);
         getCommand("war").setExecutor(handler);
         getCommand("alliance").setExecutor(handler);
+        getCommand("warmode").setExecutor(handler);
+        getCommand("warscoreboard").setExecutor(handler);
+        getCommand("claimadmin").setExecutor(handler);
 
         // Move listener
         moveListener = new MoveListener(this, townManager);

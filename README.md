@@ -8,6 +8,7 @@ VisualClaims is a Paper/Spigot plugin that lets players found towns, invite frie
 - Sync every claim to Dynmap with custom colours, configurable line weight, and fill opacity.
 - Public town listings show descriptions, members, alliances, wars, and claim counts.
 - Chunk history keeps a log of who claimed a spot and what alliances/wars were active at the time.
+- Server-wide war mode shows a live scoreboard of wars/alliances, with per-player scoreboard toggles.
 - Territory entry notifications alert town members/owners when someone enters their land.
 - Store towns as JSON on disk for safe restarts and easy editing.
 - Simple permission scheme with an admin bypass for moderators and test servers.
@@ -87,11 +88,19 @@ line-weight: 2
 | `/war <town>` | Declare/resolve war with another town (owner only). | `visclaims.war` | true |
 | `/alliance <town>|accept <town>|remove <town>` | Manage alliances (owner only). | `visclaims.alliance` | true |
 | `/claim` | Show the quick reference help. | `visclaims.help` | true |
+| `/warscoreboard` | Toggle your war/alliance sidebar scoreboard. | `visclaims.warscoreboard` | true |
+| `/warmode <on|off>` | Admin: enable/disable global war mode & scoreboards. | `visclaims.warmode` | op |
+| `/claimadmin` | Admin-only help list. | `visclaims.adminhelp` | op |
 | `/adjustclaims <player> <add|remove> <amount>` | Admin: add or subtract bonus claim slots for a player. | `visclaims.admin` | op |
 
 `visclaims.admin` grants moderators the ability to bypass claim limits and force-unclaim land owned by other towns.
 
 Playtime scaling reads the built-in `Statistic.PLAY_ONE_MINUTE` (same counter used by EssentialsX `/playtime`) and grants `chunks-per-hour` claims per played hour. Existing claims are never revoked if the cap drops; the player simply cannot claim more until their allowance grows.
+
+### Notes
+- `/towns` lists only town names with a clickable `[Info]` button to open details, using each town's configured colour.
+- War/alliance commands are only available while admins have enabled `/warmode`. Enabling war mode turns on the scoreboard for everyone by default; players can use `/warscoreboard` to toggle their own view.
+- Chunk history is bootstrapped on load so existing claims have a baseline entry.
 
 ### Supported Colours
 `VanillaColor` covers the standard Minecraft chat colour names: `BLACK`, `DARK_BLUE`, `DARK_GREEN`, `DARK_AQUA`, `DARK_RED`, `DARK_PURPLE`, `GOLD`, `GRAY`, `DARK_GRAY`, `BLUE`, `GREEN`, `AQUA`, `RED`, `LIGHT_PURPLE`, `YELLOW`, `WHITE`.

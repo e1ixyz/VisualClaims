@@ -55,6 +55,11 @@ public class MoveListener implements Listener {
         Chunk to = e.getTo().getChunk();
         if (from.equals(to)) return;
 
+        // Disable auto modes on teleport
+        UUID id = e.getPlayer().getUniqueId();
+        if (autoclaim.remove(id) != null) e.getPlayer().sendMessage("§cAutoclaim disabled (teleport).");
+        if (autohistory.remove(id) != null) e.getPlayer().sendMessage("§cAutohistory disabled (teleport).");
+
         handleChunkChange(e.getPlayer(), to);
     }
 

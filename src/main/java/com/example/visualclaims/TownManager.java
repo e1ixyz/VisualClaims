@@ -43,6 +43,10 @@ public class TownManager {
     private final Map<UUID, AllianceInvite> pendingAllianceInvites = new HashMap<>();
     // chunkId -> history entries (newest first)
     private final Map<String, List<ChunkHistoryEntry>> chunkHistory = new HashMap<>();
+    // players who disabled the war scoreboard
+    private final Set<UUID> scoreboardDisabled = new HashSet<>();
+
+    private boolean warModeEnabled = false;
 
     private Scoreboard warBoard;
     private Objective warObjective;
@@ -348,6 +352,7 @@ public class TownManager {
             }
         }
         loadHistory();
+        bootstrapHistoryForExistingClaims();
         refreshWarScoreboard();
     }
 
@@ -429,15 +434,16 @@ public class TownManager {
         ScoreboardManager mgr = Bukkit.getScoreboardManager();
         if (mgr == null) return;
 
-        List<String> wars = buildWarLines();
-        List<String> allies = buildAllianceLines();
-        if (wars.isEmpty() && allies.isEmpty()) {
+        if (!warModeEnabled) {
             Scoreboard main = mgr.getMainScoreboard();
             for (Player p : Bukkit.getOnlinePlayers()) p.setScoreboard(main);
             warBoard = null;
             warObjective = null;
             return;
         }
+
+        List<String> wars = buildWarLines();
+        List<String> allies = buildAllianceLines();
 
         Scoreboard board = mgr.getNewScoreboard();
         Objective obj = board.registerNewObjective("vc_war", "dummy", ChatColor.RED + "" + ChatColor.BOLD + "War Mode");
@@ -446,17 +452,25 @@ public class TownManager {
         int score = 15;
         obj.getScore(ChatColor.GOLD + "Wars").setScore(score--);
         int idx = 1;
-        for (String line : wars) {
-            if (score < 1) break;
-            obj.getScore(ChatColor.WHITE + "" + idx + ". " + line).setScore(score--);
-            idx++;
+        if (wars.isEmpty()) {
+            obj.getScore(ChatColor.GRAY + "None").setScore(score--);
+        } else {
+            for (String line : wars) {
+                if (score < 1) break;
+                obj.getScore(ChatColor.WHITE + "" + idx + ". " + line).setScore(score--);
+                idx++;
+            }
         }
         obj.getScore(ChatColor.AQUA + "Alliances").setScore(score--);
         idx = 1;
-        for (String line : allies) {
-            if (score < 1) break;
-            obj.getScore(ChatColor.WHITE + "" + idx + ". " + line).setScore(score--);
-            idx++;
+        if (allies.isEmpty()) {
+            obj.getScore(ChatColor.GRAY + "None ").setScore(score--);
+        } else {
+            for (String line : allies) {
+                if (score < 1) break;
+                obj.getScore(ChatColor.WHITE + "" + idx + ". " + line).setScore(score--);
+                idx++;
+            }
         }
 
         warBoard = board;
@@ -467,8 +481,11 @@ public class TownManager {
     }
 
     public void applyScoreboard(Player p) {
-        if (warBoard != null) {
+        if (warBoard != null && warModeEnabled && !scoreboardDisabled.contains(p.getUniqueId())) {
             p.setScoreboard(warBoard);
+        } else {
+            ScoreboardManager mgr = Bukkit.getScoreboardManager();
+            if (mgr != null) p.setScoreboard(mgr.getMainScoreboard());
         }
     }
 
@@ -490,5 +507,56 @@ public class TownManager {
             names.add(t != null ? townLabel(t) : ownerName(id));
         }
         return names;
+    }
+
+    public void setWarModeEnabled(boolean enabled) {
+        this.warModeEnabled = enabled;
+        if (enabled) {
+            scoreboardDisabled.clear();
+        }
+        refreshWarScoreboard();
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            applyScoreboard(p);
+        }
+    }
+
+    public boolean isWarModeEnabled() {
+        return warModeEnabled;
+    }
+
+    public boolean toggleScoreboard(UUID player) {
+        if (scoreboardDisabled.contains(player)) {
+            scoreboardDisabled.remove(player);
+            Player p = Bukkit.getPlayer(player);
+            if (p != null) applyScoreboard(p);
+            return true;
+        } else {
+            scoreboardDisabled.add(player);
+            Player p = Bukkit.getPlayer(player);
+            if (p != null) {
+                ScoreboardManager mgr = Bukkit.getScoreboardManager();
+                if (mgr != null) p.setScoreboard(mgr.getMainScoreboard());
+            }
+            return false;
+        }
+    }
+
+    public net.md_5.bungee.api.ChatColor toChatColor(VanillaColor c) {
+        if (c == null) return null;
+        try {
+            return net.md_5.bungee.api.ChatColor.valueOf(c.name());
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    private void bootstrapHistoryForExistingClaims() {
+        for (Town t : townsByOwner.values()) {
+            for (ChunkPos pos : t.getClaims()) {
+                if (!chunkHistory.containsKey(pos.id()) || chunkHistory.get(pos.id()).isEmpty()) {
+                    recordHistory(pos, "EXISTING", t);
+                }
+            }
+        }
     }
 }
