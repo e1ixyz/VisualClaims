@@ -54,6 +54,7 @@ public class VisualClaims extends JavaPlugin {
         getCommand("warmode").setExecutor(handler);
         getCommand("warscoreboard").setExecutor(handler);
         getCommand("claimadmin").setExecutor(handler);
+        getCommand("admindeletetown").setExecutor(handler);
 
         // Move listener
         moveListener = new MoveListener(this, townManager);

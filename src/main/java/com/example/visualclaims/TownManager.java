@@ -89,6 +89,29 @@ public class TownManager {
         return true;
     }
 
+    public boolean adminDeleteTown(Town t) {
+        if (t == null) return false;
+        UUID owner = t.getOwner();
+        townsByOwner.remove(owner);
+        for (ChunkPos pos : new HashSet<>(t.getClaims())) {
+            townsByChunkId.remove(pos.id());
+            if (dynmap != null) dynmap.removeAreaMarker(pos);
+            recordHistory(pos, "ADMIN-DELETE", t);
+        }
+        townsByMember.remove(owner);
+        for (UUID m : new HashSet<>(t.getMembers())) townsByMember.remove(m);
+        for (Town other : townsByOwner.values()) {
+            other.getAllies().remove(owner);
+            other.getWars().remove(owner);
+        }
+        pendingInvites.entrySet().removeIf(e -> e.getValue().getTownOwner().equals(owner));
+        pendingAllianceInvites.entrySet().removeIf(e -> e.getValue().getFromOwner().equals(owner) || e.getValue().getToOwner().equals(owner));
+        File f = new File(townsDir, owner.toString() + ".json");
+        if (f.exists()) f.delete();
+        refreshWarScoreboard();
+        return true;
+    }
+
     public boolean deleteTown(UUID owner) {
         Town t = townsByOwner.remove(owner);
         if (t == null) return false;
@@ -281,7 +304,7 @@ public class TownManager {
         int hours = getPlaytimeHours(owner);
         int dynamic = hours * chunksPerHour;
 
-        int limit = Math.max(baseMax, dynamic) + bonus;
+        int limit = baseMax + dynamic + bonus;
         int currentClaims = (t != null) ? t.claimCount() : 0;
         return Math.max(limit, currentClaims);
     }
@@ -382,8 +405,8 @@ public class TownManager {
 
     private void recordHistory(ChunkPos pos, String action, Town t) {
         List<ChunkHistoryEntry> list = chunkHistory.computeIfAbsent(pos.id(), k -> new ArrayList<>());
-        List<String> allies = t == null ? Collections.emptyList() : resolveNames(t.getAllies());
-        List<String> wars = t == null ? Collections.emptyList() : resolveNames(t.getWars());
+        List<String> allies = t == null ? Collections.emptyList() : resolveColoredNames(t.getAllies());
+        List<String> wars = t == null ? Collections.emptyList() : resolveColoredNames(t.getWars());
         list.add(0, new ChunkHistoryEntry(System.currentTimeMillis(), action, t == null ? "Unclaimed" : t.getName(), t == null ? null : t.getOwner(), allies, wars));
         if (list.size() > HISTORY_LIMIT) {
             while (list.size() > HISTORY_LIMIT) list.remove(list.size() - 1);
@@ -445,6 +468,14 @@ public class TownManager {
         List<String> wars = buildWarLines();
         List<String> allies = buildAllianceLines();
 
+        if (wars.isEmpty()) {
+            Scoreboard main = mgr.getMainScoreboard();
+            for (Player p : Bukkit.getOnlinePlayers()) p.setScoreboard(main);
+            warBoard = null;
+            warObjective = null;
+            return;
+        }
+
         Scoreboard board = mgr.getNewScoreboard();
         Objective obj = board.registerNewObjective("vc_war", "dummy", ChatColor.RED + "" + ChatColor.BOLD + "War Mode");
         obj.setDisplaySlot(DisplaySlot.SIDEBAR);
@@ -491,7 +522,9 @@ public class TownManager {
 
     private String townLabel(Town t) {
         if (t == null) return "Unknown";
-        return t.getName() != null ? t.getName() : ownerName(t.getOwner());
+        ChatColor color = toBukkitColor(t.getColor());
+        String base = t.getName() != null ? t.getName() : ownerName(t.getOwner());
+        return (color != null ? color.toString() : "") + base + ChatColor.RESET;
     }
 
     private String ownerName(UUID id) {
@@ -509,6 +542,20 @@ public class TownManager {
         return names;
     }
 
+    private List<String> resolveColoredNames(Set<UUID> ids) {
+        List<String> names = new ArrayList<>();
+        if (ids == null) return names;
+        for (UUID id : ids) {
+            Town t = townsByOwner.get(id);
+            if (t != null) names.add(coloredTownName(t));
+            else {
+                OfflinePlayer op = Bukkit.getOfflinePlayer(id);
+                names.add(op.getName() != null ? op.getName() : id.toString().substring(0, 8));
+            }
+        }
+        return names;
+    }
+
     public void setWarModeEnabled(boolean enabled) {
         this.warModeEnabled = enabled;
         if (enabled) {
@@ -517,6 +564,9 @@ public class TownManager {
         refreshWarScoreboard();
         for (Player p : Bukkit.getOnlinePlayers()) {
             applyScoreboard(p);
+            if (enabled) {
+                p.playSound(p.getLocation(), org.bukkit.Sound.ENTITY_ENDER_DRAGON_DEATH, 1.0f, 1.0f);
+            }
         }
     }
 
@@ -548,6 +598,22 @@ public class TownManager {
         } catch (Exception ex) {
             return null;
         }
+    }
+
+    public ChatColor toBukkitColor(VanillaColor c) {
+        if (c == null) return null;
+        try {
+            return ChatColor.valueOf(c.name());
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    public String coloredTownName(Town t) {
+        if (t == null) return "Unknown";
+        ChatColor color = toBukkitColor(t.getColor());
+        String name = t.getName() != null ? t.getName() : ownerName(t.getOwner());
+        return (color != null ? color.toString() : ChatColor.GREEN.toString()) + name + ChatColor.RESET;
     }
 
     private void bootstrapHistoryForExistingClaims() {

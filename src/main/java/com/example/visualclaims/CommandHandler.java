@@ -61,6 +61,7 @@ public class CommandHandler implements CommandExecutor {
             case "warmode": return warModeAdmin(p, args);
             case "warscoreboard": return toggleWarScoreboard(p);
             case "claimadmin": return claimAdminHelp(p, args);
+            case "admindeletetown": return adminDeleteTown(p, args);
             default: return false;
         }
     }
@@ -122,7 +123,7 @@ public class CommandHandler implements CommandExecutor {
             p.sendMessage("§aClaimed chunk at §e(" + c.getX() + ", " + c.getZ() + ")");
         } else {
             Optional<Town> other = towns.getTownAt(c);
-            if (other.isPresent()) p.sendMessage("§cChunk already claimed by §e" + other.get().getName());
+            if (other.isPresent()) p.sendMessage("§cChunk already claimed by §e" + towns.coloredTownName(other.get()));
             else p.sendMessage("§cCannot claim chunk: limit reached (§e" + max + "§c).");
         }
         return true;
@@ -239,10 +240,10 @@ public class CommandHandler implements CommandExecutor {
         Town t = tOpt.get();
         String ownerName = plugin.getServer().getOfflinePlayer(t.getOwner()).getName();
         List<String> memberNames = resolveNames(t.getMembers());
-        List<String> allyNames = resolveNames(t.getAllies());
-        List<String> warNames = resolveNames(t.getWars());
+        List<String> allyNames = resolveTownNames(t.getAllies());
+        List<String> warNames = resolveTownNames(t.getWars());
         p.sendMessage("§e--- Town Info ---");
-        p.sendMessage("§7Name: §f" + t.getName());
+        p.sendMessage("§7Name: §f" + towns.coloredTownName(t));
         p.sendMessage("§7Owner: §f" + (ownerName != null ? ownerName : t.getOwner()));
         p.sendMessage("§7Description: §f" + t.getDescription());
         p.sendMessage("§7Color: §f" + t.getColorName());
@@ -279,22 +280,25 @@ public class CommandHandler implements CommandExecutor {
 
         Town t = townOpt.get();
         int playtimeHours = towns.getPlaytimeHours(t.getOwner());
-        int limit = towns.computeMaxClaims(t.getOwner());
         int claimed = townOpt.get().claimCount();
         int bonus = townOpt.get().getBonusChunks();
         int chunksPerHour = Math.max(1, plugin.getConfig().getInt("chunks-per-hour", 2));
         boolean usingPlaytime = plugin.getConfig().getBoolean("use-playtime-scaling", false);
         int baseMax = plugin.getConfig().getInt("max-claims-per-player", 64);
+        int playtimeAllowance = usingPlaytime ? playtimeHours * chunksPerHour : 0;
+        int theoretical = baseMax + playtimeAllowance + bonus;
+        int limit = Math.max(theoretical, claimed);
+        int overflow = Math.max(0, claimed - theoretical);
 
         p.sendMessage("§e--- Claim Limit for " + targetName + " ---");
-        p.sendMessage("§7Claims: §f" + claimed + " §7/ Limit: §f" + limit);
-        p.sendMessage("§7Bonus chunks: §f" + bonus);
+        p.sendMessage("§7Base cap: §f" + baseMax);
         if (usingPlaytime) {
-            p.sendMessage("§7Playtime: §f" + playtimeHours + "h §7at §f" + chunksPerHour + " chunks/hour");
-            p.sendMessage("§7Base cap (min): §f" + baseMax);
-        } else {
-            p.sendMessage("§7Playtime scaling: §cdisabled §7(Base cap: §f" + baseMax + "§7)");
+            p.sendMessage("§7Playtime: §f" + playtimeHours + "h §7@ §f" + chunksPerHour + " §7chunks/hour => §f" + playtimeAllowance);
         }
+        p.sendMessage("§7Bonus: §f" + bonus);
+        p.sendMessage("§7Allowed total: §f" + theoretical + (overflow > 0 ? " §8(overflow by " + overflow + " grandfathered)" : ""));
+        p.sendMessage("§7Claims held: §f" + claimed);
+        p.sendMessage("§7Effective limit (never lowers below claims): §f" + limit);
         return true;
     }
 
@@ -421,7 +425,7 @@ public class CommandHandler implements CommandExecutor {
         }
         p.sendMessage("§aInvitation sent to §e" + (target.getName() != null ? target.getName() : args[0]));
         if (target.isOnline()) {
-            target.getPlayer().sendMessage("§aYou have been invited to join §e" + tOpt.get().getName() + "§a. Use §e/jointown " + tOpt.get().getName() + " §ato accept.");
+            target.getPlayer().sendMessage("§aYou have been invited to join §e" + towns.coloredTownName(tOpt.get()) + "§a. Use §e/jointown " + tOpt.get().getName() + " §ato accept.");
         }
         return true;
     }
@@ -442,7 +446,7 @@ public class CommandHandler implements CommandExecutor {
             return true;
         }
         Town t = joined.get();
-        p.sendMessage("§aJoined town §e" + t.getName());
+        p.sendMessage("§aJoined town §e" + towns.coloredTownName(t));
         towns.messageTown(t, "§e" + p.getName() + " §7joined your town.");
         return true;
     }
@@ -459,7 +463,7 @@ public class CommandHandler implements CommandExecutor {
         }
         Town t = tOpt.get();
         List<String> members = resolveNames(t.getMembers());
-        p.sendMessage("§e--- Members of " + t.getName() + " ---");
+        p.sendMessage("§e--- Members of " + towns.coloredTownName(t) + " ---");
         p.sendMessage("§7Owner: §f" + p.getName());
         p.sendMessage("§7Members: §f" + (members.isEmpty() ? "none" : String.join(", ", members)));
         return true;
@@ -491,7 +495,7 @@ public class CommandHandler implements CommandExecutor {
         boolean ok = towns.removeMember(p.getUniqueId(), target.getUniqueId());
         if (ok) {
             p.sendMessage("§aRemoved §e" + (target.getName() != null ? target.getName() : args[0]) + " §afrom your town.");
-            if (target.isOnline()) target.getPlayer().sendMessage("§cYou have been removed from town §e" + tOpt.get().getName());
+            if (target.isOnline()) target.getPlayer().sendMessage("§cYou have been removed from town §e" + towns.coloredTownName(tOpt.get()));
         } else {
             p.sendMessage("§cFailed to remove member.");
         }
@@ -537,9 +541,9 @@ public class CommandHandler implements CommandExecutor {
         Town t = tOpt.get();
         String ownerName = plugin.getServer().getOfflinePlayer(t.getOwner()).getName();
         List<String> members = resolveNames(t.getMembers());
-        List<String> allies = resolveNames(t.getAllies());
-        List<String> wars = resolveNames(t.getWars());
-        p.sendMessage("§e--- Town " + t.getName() + " ---");
+        List<String> allies = resolveTownNames(t.getAllies());
+        List<String> wars = resolveTownNames(t.getWars());
+        p.sendMessage("§e--- Town " + towns.coloredTownName(t) + " ---");
         p.sendMessage("§7Owner: §f" + (ownerName != null ? ownerName : t.getOwner()));
         p.sendMessage("§7Description: §f" + t.getDescription());
         p.sendMessage("§7Members: §f" + (members.isEmpty() ? "none" : String.join(", ", members)));
@@ -566,7 +570,8 @@ public class CommandHandler implements CommandExecutor {
             if (shown >= 5) break;
             String allies = e.getAlliances().isEmpty() ? "none" : String.join(", ", e.getAlliances());
             String wars = e.getWars().isEmpty() ? "none" : String.join(", ", e.getWars());
-            p.sendMessage("§f" + e.getAction() + " §7by §e" + e.getTownName() + " §7(" + formatAgo(e.getTimestamp()) + ")");
+            String coloredName = e.getTownOwner() != null ? towns.getTownByOwner(e.getTownOwner()).map(towns::coloredTownName).orElse(e.getTownName()) : e.getTownName();
+            p.sendMessage("§f" + e.getAction() + " §7by §e" + coloredName + " §7(" + formatAgo(e.getTimestamp()) + ")");
             p.sendMessage("§7Allies: §f" + allies + " §7Wars: §f" + wars);
             shown++;
         }
@@ -619,11 +624,11 @@ public class CommandHandler implements CommandExecutor {
             return true;
         }
         if (alreadyWar) {
-            p.sendMessage("§aYou are no longer at war with §e" + other.getName());
-            towns.messageTown(other, "§e" + mine.getName() + " §7ended the war.");
+            p.sendMessage("§aYou are no longer at war with §e" + towns.coloredTownName(other));
+            towns.messageTown(other, "§e" + towns.coloredTownName(mine) + " §7ended the war.");
         } else {
-            p.sendMessage("§cYou declared war on §e" + other.getName());
-            towns.messageTown(other, "§c" + mine.getName() + " §7declared war on you!");
+            p.sendMessage("§cYou declared war on §e" + towns.coloredTownName(other));
+            towns.messageTown(other, "§c" + towns.coloredTownName(mine) + " §7declared war on you!");
         }
         return true;
     }
@@ -660,9 +665,9 @@ public class CommandHandler implements CommandExecutor {
             }
             Town other = targetOpt.get();
             boolean ok = towns.acceptAlliance(myTown.getOwner(), other.getOwner());
-            p.sendMessage(ok ? "§aAlliance accepted with §e" + other.getName() : "§cNo pending alliance invite from that town.");
+            p.sendMessage(ok ? "§aAlliance accepted with §e" + towns.coloredTownName(other) : "§cNo pending alliance invite from that town.");
             if (ok) {
-                towns.messageTown(other, "§a" + myTown.getName() + " §7accepted your alliance.");
+                towns.messageTown(other, "§a" + towns.coloredTownName(myTown) + " §7accepted your alliance.");
             }
             return true;
         } else if (sub.equals("remove")) {
@@ -671,17 +676,17 @@ public class CommandHandler implements CommandExecutor {
                 return true;
             }
             Optional<Town> targetOpt = towns.findTown(String.join(" ", Arrays.copyOfRange(args, 1, args.length)));
-            if (targetOpt.isEmpty()) {
-                p.sendMessage("§cNo matching town found.");
-                return true;
-            }
-            Town other = targetOpt.get();
-            boolean ok = towns.removeAlliance(myTown.getOwner(), other.getOwner());
-            p.sendMessage(ok ? "§cAlliance removed with §e" + other.getName() : "§cNo alliance existed with that town.");
-            if (ok) {
-                towns.messageTown(other, "§c" + myTown.getName() + " §7ended the alliance.");
-            }
+        if (targetOpt.isEmpty()) {
+            p.sendMessage("§cNo matching town found.");
             return true;
+        }
+        Town other = targetOpt.get();
+        boolean ok = towns.removeAlliance(myTown.getOwner(), other.getOwner());
+        p.sendMessage(ok ? "§cAlliance removed with §e" + towns.coloredTownName(other) : "§cNo alliance existed with that town.");
+        if (ok) {
+            towns.messageTown(other, "§c" + towns.coloredTownName(myTown) + " §7ended the alliance.");
+        }
+        return true;
         }
 
         Optional<Town> targetOpt = towns.findTown(String.join(" ", args));
@@ -703,8 +708,8 @@ public class CommandHandler implements CommandExecutor {
             p.sendMessage("§cFailed to send alliance invite.");
             return true;
         }
-        p.sendMessage("§aAlliance invite sent to §e" + other.getName());
-        towns.messageTown(other, "§a" + myTown.getName() + " §7has invited you to form an alliance. Owner can use §e/alliance accept " + myTown.getName() + " §7to accept.");
+        p.sendMessage("§aAlliance invite sent to §e" + towns.coloredTownName(other));
+        towns.messageTown(other, "§a" + towns.coloredTownName(myTown) + " §7has invited you to form an alliance. Owner can use §e/alliance accept " + myTown.getName() + " §7to accept.");
         return true;
     }
 
@@ -743,7 +748,27 @@ public class CommandHandler implements CommandExecutor {
         p.sendMessage("§f/adjustclaims <player> <add|remove> <amount> §7- Modify bonus claims");
         p.sendMessage("§f/warmode <on|off> §7- Toggle global war mode & scoreboards");
         p.sendMessage("§f/warscoreboard §7- Toggle your war scoreboard view");
+        p.sendMessage("§f/admindeletetown <town> §7- Delete a town by name/owner");
         p.sendMessage("§f/unclaim (with visclaims.admin) §7- Force unclaim any chunk");
+        return true;
+    }
+
+    private boolean adminDeleteTown(Player p, String[] args) {
+        if (!p.hasPermission("visclaims.admindelete")) {
+            p.sendMessage("§cNo permission.");
+            return true;
+        }
+        if (args.length != 1) {
+            p.sendMessage("Usage: /admindeletetown <town or owner>");
+            return true;
+        }
+        Optional<Town> target = towns.findTown(String.join(" ", args));
+        if (target.isEmpty()) {
+            p.sendMessage("§cNo matching town found.");
+            return true;
+        }
+        boolean ok = towns.adminDeleteTown(target.get());
+        p.sendMessage(ok ? "§cDeleted town §e" + towns.coloredTownName(target.get()) : "§cFailed to delete town.");
         return true;
     }
 
@@ -753,6 +778,19 @@ public class CommandHandler implements CommandExecutor {
         for (UUID id : ids) {
             var off = plugin.getServer().getOfflinePlayer(id);
             names.add(off.getName() != null ? off.getName() : id.toString().substring(0, 8));
+        }
+        return names;
+    }
+
+    private List<String> resolveTownNames(Collection<UUID> owners) {
+        List<String> names = new ArrayList<>();
+        if (owners == null) return names;
+        for (UUID id : owners) {
+            Optional<Town> t = towns.getTownByOwner(id);
+            names.add(t.map(towns::coloredTownName).orElseGet(() -> {
+                var off = plugin.getServer().getOfflinePlayer(id);
+                return off.getName() != null ? off.getName() : id.toString().substring(0, 8);
+            }));
         }
         return names;
     }

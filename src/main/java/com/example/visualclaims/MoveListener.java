@@ -95,7 +95,7 @@ public class MoveListener implements Listener {
         String prevTown = lastTownAt.get(uuid);
 
         if (!Objects.equals(prevTown, nowTown)) {
-            if (nowTown != null) p.sendMessage("§7Now entering §a" + nowTown);
+            if (nowTown != null) p.sendMessage("§7Now entering §a" + townManager.coloredTownName(atTown.get()));
             if (prevTown != null && nowTown == null) p.sendMessage("§7Now leaving §c" + prevTown);
             if (prevTown != null && nowTown != null && !prevTown.equals(nowTown)) p.sendMessage("§7Now leaving §c" + prevTown);
             lastTownAt.put(uuid, nowTown);
@@ -142,7 +142,7 @@ public class MoveListener implements Listener {
     private void notifyTownEntry(Player entrant, Town town) {
         Optional<Town> entrantTown = townManager.getTownOf(entrant.getUniqueId());
         if (entrantTown.isPresent() && entrantTown.get().getOwner().equals(town.getOwner())) return;
-        String msg = "§e" + entrant.getName() + " §7entered §a" + town.getName() + "§7 territory.";
+        String msg = "§e" + entrant.getName() + " §7entered §a" + townManager.coloredTownName(town) + "§7 territory.";
         townManager.messageTown(town, msg);
     }
 

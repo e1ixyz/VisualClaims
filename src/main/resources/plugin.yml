@@ -106,6 +106,10 @@ commands:
     description: Show admin-only claim commands
     usage: /claimadmin
     permission: visclaims.adminhelp
+  admindeletetown:
+    description: "Admin: delete a town by name/owner"
+    usage: /admindeletetown <town>
+    permission: visclaims.admindelete
 
 permissions:
   visclaims.createtown:
@@ -179,6 +183,9 @@ permissions:
     default: true
   visclaims.adminhelp:
     description: Allows viewing admin claim help
+    default: op
+  visclaims.admindelete:
+    description: Allows deleting any town
     default: op
   visclaims.admin:
     description: Bypass limits and manage towns for testing/admin purposes
