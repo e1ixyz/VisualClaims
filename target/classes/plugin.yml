@@ -95,7 +95,7 @@ commands:
     usage: /alliance <town>|accept <town>|remove <town>
     permission: visclaims.alliance
   warmode:
-    description: Admin: toggle global war mode and scoreboards
+    description: "Admin: toggle global war mode and scoreboards"
     usage: /warmode <on|off>
     permission: visclaims.warmode
   warscoreboard:
