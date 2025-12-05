@@ -17,6 +17,7 @@ public class MoveListener implements Listener {
     private final Map<UUID, Boolean> autoclaim = new HashMap<>();
     private final Map<UUID, Boolean> autohistory = new HashMap<>();
     private final Map<UUID, String> lastTownAt = new HashMap<>();
+    private final Map<UUID, UUID> lastTownOwner = new HashMap<>();
     private final Map<UUID, String> lastChunkId = new HashMap<>();
 
     public MoveListener(VisualClaims plugin, TownManager townManager) {
@@ -69,6 +70,7 @@ public class MoveListener implements Listener {
         autoclaim.remove(id);
         autohistory.remove(id);
         lastTownAt.remove(id);
+        lastTownOwner.remove(id);
         lastChunkId.remove(id);
     }
 
@@ -91,15 +93,29 @@ public class MoveListener implements Listener {
 
     private void updateTownPresence(Player p, Optional<Town> atTown) {
         UUID uuid = p.getUniqueId();
-        String nowTown = atTown.map(Town::getName).orElse(null);
-        String prevTown = lastTownAt.get(uuid);
+        Town currentTown = atTown.orElse(null);
+        UUID currentOwner = currentTown != null ? currentTown.getOwner() : null;
+        UUID prevOwner = lastTownOwner.get(uuid);
+        String prevTownName = lastTownAt.get(uuid);
+        Town prevTown = prevOwner == null ? null : townManager.getTownByOwner(prevOwner).orElse(null);
+        if (prevTown == null && prevTownName != null) {
+            prevTown = townManager.findTown(prevTownName).orElse(null);
+        }
 
-        if (!Objects.equals(prevTown, nowTown)) {
-            if (nowTown != null) p.sendMessage("§7Now entering §a" + townManager.coloredTownName(atTown.get()));
-            if (prevTown != null && nowTown == null) p.sendMessage("§7Now leaving §c" + prevTown);
-            if (prevTown != null && nowTown != null && !prevTown.equals(nowTown)) p.sendMessage("§7Now leaving §c" + prevTown);
-            lastTownAt.put(uuid, nowTown);
-            atTown.ifPresent(t -> notifyTownEntry(p, t));
+        if (!Objects.equals(prevOwner, currentOwner)) {
+            if (prevTown != null || prevTownName != null) {
+                String label = townManager.coloredTownName(prevOwner, prevTownName);
+                p.sendMessage("§7Now leaving " + label);
+            }
+            if (currentTown != null) {
+                p.sendMessage("§7Now entering " + townManager.coloredTownName(currentTown));
+                notifyTownEntry(p, currentTown);
+                lastTownAt.put(uuid, currentTown.getName());
+                lastTownOwner.put(uuid, currentOwner);
+            } else {
+                lastTownAt.remove(uuid);
+                lastTownOwner.remove(uuid);
+            }
         }
     }
 
@@ -134,7 +150,8 @@ public class MoveListener implements Listener {
         for (int i = 0; i < shown; i++) {
             ChunkHistoryEntry e = entries.get(i);
             if (i > 0) sb.append(" §8| ");
-            sb.append(e.getAction()).append(" ").append(e.getTownName()).append(" (").append(formatAgo(e.getTimestamp())).append(")");
+            String townLabel = townManager.coloredTownName(e.getTownOwner(), e.getTownName());
+            sb.append(e.getAction()).append(" ").append(townLabel).append(" (").append(formatAgo(e.getTimestamp())).append(")");
         }
         p.sendMessage(sb.toString());
     }
@@ -142,7 +159,7 @@ public class MoveListener implements Listener {
     private void notifyTownEntry(Player entrant, Town town) {
         Optional<Town> entrantTown = townManager.getTownOf(entrant.getUniqueId());
         if (entrantTown.isPresent() && entrantTown.get().getOwner().equals(town.getOwner())) return;
-        String msg = "§e" + entrant.getName() + " §7entered §a" + townManager.coloredTownName(town) + "§7 territory.";
+        String msg = "§e" + entrant.getName() + " §7entered " + townManager.coloredTownName(town) + "§7 territory.";
         townManager.messageTown(town, msg);
     }
 

@@ -83,7 +83,12 @@ public class CommandHandler implements CommandExecutor {
         }
         VanillaColor defaultColor = VanillaColor.fromString(plugin.getConfig().getString("default-color", "GREEN"));
         boolean ok = towns.createTown(uuid, name, defaultColor == null ? VanillaColor.GREEN : defaultColor, p.getWorld().getName());
-        p.sendMessage(ok ? "§aCreated town §e" + name : "§cFailed to create town (name taken?).");
+        if (ok) {
+            String label = towns.getTownOf(uuid).map(towns::coloredTownName).orElse("§e" + name + "§r");
+            p.sendMessage("§aCreated town " + label);
+        } else {
+            p.sendMessage("§cFailed to create town (name taken?).");
+        }
         return true;
     }
 
@@ -196,7 +201,7 @@ public class CommandHandler implements CommandExecutor {
         t.setName(newName);
         towns.saveTown(t);
         if (plugin.getDynmapHook() != null) plugin.getDynmapHook().refreshTownAreas(t);
-        p.sendMessage("§aTown renamed to §e" + newName);
+        p.sendMessage("§aTown renamed to " + towns.coloredTownName(t));
         return true;
     }
 
@@ -463,7 +468,7 @@ public class CommandHandler implements CommandExecutor {
         }
         Town t = tOpt.get();
         List<String> members = resolveNames(t.getMembers());
-        p.sendMessage("§e--- Members of " + towns.coloredTownName(t) + " ---");
+        p.sendMessage("§e--- Members of " + towns.coloredTownName(t) + "§e ---");
         p.sendMessage("§7Owner: §f" + p.getName());
         p.sendMessage("§7Members: §f" + (members.isEmpty() ? "none" : String.join(", ", members)));
         return true;
@@ -543,7 +548,7 @@ public class CommandHandler implements CommandExecutor {
         List<String> members = resolveNames(t.getMembers());
         List<String> allies = resolveTownNames(t.getAllies());
         List<String> wars = resolveTownNames(t.getWars());
-        p.sendMessage("§e--- Town " + towns.coloredTownName(t) + " ---");
+        p.sendMessage("§e--- Town " + towns.coloredTownName(t) + "§e ---");
         p.sendMessage("§7Owner: §f" + (ownerName != null ? ownerName : t.getOwner()));
         p.sendMessage("§7Description: §f" + t.getDescription());
         p.sendMessage("§7Members: §f" + (members.isEmpty() ? "none" : String.join(", ", members)));
@@ -570,8 +575,8 @@ public class CommandHandler implements CommandExecutor {
             if (shown >= 5) break;
             String allies = e.getAlliances().isEmpty() ? "none" : String.join(", ", e.getAlliances());
             String wars = e.getWars().isEmpty() ? "none" : String.join(", ", e.getWars());
-            String coloredName = e.getTownOwner() != null ? towns.getTownByOwner(e.getTownOwner()).map(towns::coloredTownName).orElse(e.getTownName()) : e.getTownName();
-            p.sendMessage("§f" + e.getAction() + " §7by §e" + coloredName + " §7(" + formatAgo(e.getTimestamp()) + ")");
+            String coloredName = towns.coloredTownName(e.getTownOwner(), e.getTownName());
+            p.sendMessage("§f" + e.getAction() + " §7by " + coloredName + " §7(" + formatAgo(e.getTimestamp()) + ")");
             p.sendMessage("§7Allies: §f" + allies + " §7Wars: §f" + wars);
             shown++;
         }

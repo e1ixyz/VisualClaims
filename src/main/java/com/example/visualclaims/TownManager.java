@@ -616,6 +616,19 @@ public class TownManager {
         return (color != null ? color.toString() : ChatColor.GREEN.toString()) + name + ChatColor.RESET;
     }
 
+    public String coloredTownName(UUID owner, String fallbackName) {
+        if (owner != null) {
+            Optional<Town> byOwner = getTownByOwner(owner);
+            if (byOwner.isPresent()) return coloredTownName(byOwner.get());
+        }
+        if (fallbackName != null && !fallbackName.isBlank()) {
+            Optional<Town> byName = findTown(fallbackName);
+            if (byName.isPresent()) return coloredTownName(byName.get());
+            return ChatColor.WHITE + fallbackName + ChatColor.RESET;
+        }
+        return ChatColor.GRAY + "Unknown" + ChatColor.RESET;
+    }
+
     private void bootstrapHistoryForExistingClaims() {
         for (Town t : townsByOwner.values()) {
             for (ChunkPos pos : t.getClaims()) {
