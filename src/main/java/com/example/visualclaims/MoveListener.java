@@ -19,6 +19,8 @@ public class MoveListener implements Listener {
     private final Map<UUID, String> lastTownAt = new HashMap<>();
     private final Map<UUID, UUID> lastTownOwner = new HashMap<>();
     private final Map<UUID, String> lastChunkId = new HashMap<>();
+    private final Set<UUID> hiddenChunkMessages = new HashSet<>();
+    private final Set<UUID> silentVisitors = new HashSet<>();
 
     public MoveListener(VisualClaims plugin, TownManager townManager) {
         this.plugin = plugin;
@@ -35,6 +37,22 @@ public class MoveListener implements Listener {
         boolean now = !autohistory.getOrDefault(uuid, false);
         autohistory.put(uuid, now);
         return now;
+    }
+
+    public boolean toggleChunkAlerts(UUID uuid) {
+        if (hiddenChunkMessages.remove(uuid)) {
+            return true; // now enabled
+        }
+        hiddenChunkMessages.add(uuid);
+        return false; // now disabled
+    }
+
+    public boolean toggleSilentVisits(UUID uuid) {
+        if (silentVisitors.remove(uuid)) {
+            return false; // now loud
+        }
+        silentVisitors.add(uuid);
+        return true; // now silent
     }
 
     @EventHandler
@@ -72,6 +90,8 @@ public class MoveListener implements Listener {
         lastTownAt.remove(id);
         lastTownOwner.remove(id);
         lastChunkId.remove(id);
+        hiddenChunkMessages.remove(id);
+        silentVisitors.remove(id);
     }
 
     @EventHandler
@@ -101,14 +121,15 @@ public class MoveListener implements Listener {
         if (prevTown == null && prevTownName != null) {
             prevTown = townManager.findTown(prevTownName).orElse(null);
         }
+        boolean showMessages = shouldShowChunkMessages(uuid);
 
         if (!Objects.equals(prevOwner, currentOwner)) {
             if (prevTown != null || prevTownName != null) {
                 String label = townManager.coloredTownName(prevOwner, prevTownName);
-                p.sendMessage("§7Now leaving " + label);
+                if (showMessages) p.sendMessage("§7Now leaving " + label);
             }
             if (currentTown != null) {
-                p.sendMessage("§7Now entering " + townManager.coloredTownName(currentTown));
+                if (showMessages) p.sendMessage("§7Now entering " + townManager.coloredTownName(currentTown));
                 notifyTownEntry(p, currentTown);
                 lastTownAt.put(uuid, currentTown.getName());
                 lastTownOwner.put(uuid, currentOwner);
@@ -159,8 +180,17 @@ public class MoveListener implements Listener {
     private void notifyTownEntry(Player entrant, Town town) {
         Optional<Town> entrantTown = townManager.getTownOf(entrant.getUniqueId());
         if (entrantTown.isPresent() && entrantTown.get().getOwner().equals(town.getOwner())) return;
+        if (!entrant.hasPermission("visclaims.silentvisit")) {
+            silentVisitors.remove(entrant.getUniqueId());
+        } else if (silentVisitors.contains(entrant.getUniqueId())) {
+            return;
+        }
         String msg = "§e" + entrant.getName() + " §7entered " + townManager.coloredTownName(town) + "§7 territory.";
         townManager.messageTown(town, msg);
+    }
+
+    private boolean shouldShowChunkMessages(UUID uuid) {
+        return !hiddenChunkMessages.contains(uuid);
     }
 
     private String formatAgo(long timestamp) {

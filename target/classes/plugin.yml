@@ -50,6 +50,14 @@ commands:
     description: Root command for claim help
     usage: /claim help
     permission: visclaims.help
+  claimalerts:
+    description: Toggle receiving claim enter/leave messages
+    usage: /claimalerts
+    permission: visclaims.claimalerts
+  silentvisit:
+    description: Toggle hiding entry alerts when visiting other towns
+    usage: /silentvisit
+    permission: visclaims.silentvisit
   claimlimit:
     description: Show playtime-based claim limit
     usage: /claimlimit [player]
@@ -145,6 +153,12 @@ permissions:
   visclaims.help:
     description: Allows using /claim help to view all claim commands
     default: true
+  visclaims.claimalerts:
+    description: Allows toggling claim entry/exit alerts
+    default: true
+  visclaims.silentvisit:
+    description: Allows entering other towns without sending alerts
+    default: op
   visclaims.claimlimit:
     description: Allows using /claimlimit to view claim limits (admins can target others)
     default: true

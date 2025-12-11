@@ -50,6 +50,8 @@ public class CommandHandler implements CommandExecutor {
             case "claim": return claimHelp(p, args);
             case "claimlimit": return claimLimit(p, args);
             case "adjustclaims": return adjustClaims(p, args);
+            case "claimalerts": return toggleClaimAlerts(p);
+            case "silentvisit": return toggleSilentVisit(p);
             case "towninvite": return inviteToTown(p, args);
             case "jointown": return joinTown(p, args);
             case "townmembers": return showTownMembers(p);
@@ -360,6 +362,8 @@ public class CommandHandler implements CommandExecutor {
         p.sendMessage("§f/unclaim §7- Unclaim the current chunk");
         p.sendMessage("§f/autoclaim §7- Toggle autoclaim for chunks");
         p.sendMessage("§f/autohistory §7- Toggle automatic chunk history feed");
+        p.sendMessage("§f/claimalerts §7- Toggle your own entering/leaving messages");
+        p.sendMessage("§f/silentvisit §7- Toggle silent entries into other towns (permission)");
         p.sendMessage("§f/settownname <name> §7- Rename your town");
         p.sendMessage("§f/settowncolor <color> §7- Change your town's color");
         p.sendMessage("§f/settowndesc <text> §7- Set your town description");
@@ -590,6 +594,22 @@ public class CommandHandler implements CommandExecutor {
         }
         boolean now = plugin.getMoveListener().toggleAutohistory(p.getUniqueId());
         p.sendMessage(now ? "§aAutohistory enabled." : "§cAutohistory disabled.");
+        return true;
+    }
+
+    private boolean toggleClaimAlerts(Player p) {
+        boolean enabled = plugin.getMoveListener().toggleChunkAlerts(p.getUniqueId());
+        p.sendMessage(enabled ? "§aClaim entry/exit messages enabled." : "§cClaim entry/exit messages disabled.");
+        return true;
+    }
+
+    private boolean toggleSilentVisit(Player p) {
+        if (!p.hasPermission("visclaims.silentvisit")) {
+            p.sendMessage("§cNo permission.");
+            return true;
+        }
+        boolean silent = plugin.getMoveListener().toggleSilentVisits(p.getUniqueId());
+        p.sendMessage(silent ? "§aSilent visiting enabled. Towns will not be alerted when you enter their land." : "§cSilent visiting disabled. Towns will be alerted when you enter their land.");
         return true;
     }
 

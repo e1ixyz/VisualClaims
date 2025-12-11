@@ -73,6 +73,8 @@ line-weight: 2
 | `/unclaim` | Unclaim the current chunk (admins can force-unclaim). | `visclaims.unclaim` | true |
 | `/autoclaim` | Toggle automatic claiming while you walk. | `visclaims.autoclaim` | true |
 | `/autohistory` | Toggle automatic chunk history popups while you walk. | `visclaims.autohistory` | true |
+| `/claimalerts` | Toggle the chat messages when you enter or leave claimed chunks. | `visclaims.claimalerts` | true |
+| `/silentvisit` | Toggle silently entering other players' towns (no alerts sent to them). | `visclaims.silentvisit` | op |
 | `/settownname <name>` | Rename your town. | `visclaims.setname` | true |
 | `/settowncolor <color>` | Change the town colour (see list below). | `visclaims.setcolor` | true |
 | `/settowndesc <text>` | Set your town description. | `visclaims.setdesc` | true |
@@ -119,6 +121,7 @@ Playtime scaling reads the built-in `Statistic.PLAY_ONE_MINUTE` (same counter us
 ## Gameplay Tips
 - Autoclaim only works if you already own a town and are inside unclaimed territory. You will receive feedback if you hit the chunk cap or collide with another town's claim.
 - Movement messages fire whenever you cross chunk boundaries—whether you walk or teleport—so players always know when they enter or leave a town.
+- Use `/claimalerts` to mute your personal enter/leave messages. Staff (or anyone with `visclaims.silentvisit`) can toggle `/silentvisit` to avoid alerting other towns when passing through their land.
 
 ## Gallery
 
