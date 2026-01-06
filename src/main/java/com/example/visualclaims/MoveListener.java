@@ -20,7 +20,6 @@ public class MoveListener implements Listener {
     private final Map<UUID, UUID> lastTownOwner = new HashMap<>();
     private final Map<UUID, String> lastChunkId = new HashMap<>();
     private final Set<UUID> hiddenChunkMessages = new HashSet<>();
-    private final Set<UUID> silentVisitors = new HashSet<>();
 
     public MoveListener(VisualClaims plugin, TownManager townManager) {
         this.plugin = plugin;
@@ -48,11 +47,7 @@ public class MoveListener implements Listener {
     }
 
     public boolean toggleSilentVisits(UUID uuid) {
-        if (silentVisitors.remove(uuid)) {
-            return false; // now loud
-        }
-        silentVisitors.add(uuid);
-        return true; // now silent
+        return townManager.toggleSilentVisit(uuid);
     }
 
     @EventHandler
@@ -91,7 +86,6 @@ public class MoveListener implements Listener {
         lastTownOwner.remove(id);
         lastChunkId.remove(id);
         hiddenChunkMessages.remove(id);
-        silentVisitors.remove(id);
     }
 
     @EventHandler
@@ -181,8 +175,8 @@ public class MoveListener implements Listener {
         Optional<Town> entrantTown = townManager.getTownOf(entrant.getUniqueId());
         if (entrantTown.isPresent() && entrantTown.get().getOwner().equals(town.getOwner())) return;
         if (!entrant.hasPermission("visclaims.silentvisit")) {
-            silentVisitors.remove(entrant.getUniqueId());
-        } else if (silentVisitors.contains(entrant.getUniqueId())) {
+            townManager.setSilentVisit(entrant.getUniqueId(), false);
+        } else if (townManager.isSilentVisitor(entrant.getUniqueId())) {
             return;
         }
         String msg = "§e" + entrant.getName() + " §7entered " + townManager.coloredTownName(town) + "§7 territory.";

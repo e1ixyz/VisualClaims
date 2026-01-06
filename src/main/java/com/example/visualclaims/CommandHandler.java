@@ -613,7 +613,7 @@ public class CommandHandler implements CommandExecutor {
             p.sendMessage("§cNo permission.");
             return true;
         }
-        boolean silent = plugin.getMoveListener().toggleSilentVisits(p.getUniqueId());
+        boolean silent = towns.toggleSilentVisit(p.getUniqueId());
         p.sendMessage(silent ? "§aSilent visiting enabled. Towns will not be alerted when you enter their land." : "§cSilent visiting disabled. Towns will be alerted when you enter their land.");
         return true;
     }

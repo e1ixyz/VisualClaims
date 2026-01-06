@@ -26,6 +26,7 @@ public class TownManager {
     private final File townsDir;
     private final File historyFile;
     private final File statsFile;
+    private final File silentVisitFile;
     private final Gson gson;
 
     private static final int HISTORY_LIMIT = 10;
@@ -48,6 +49,8 @@ public class TownManager {
     private final Set<UUID> scoreboardDisabled = new HashSet<>();
     // players who disabled the leaderboard scoreboard
     private final Set<UUID> leaderboardDisabled = new HashSet<>();
+    // players who enabled silent visiting
+    private final Set<UUID> silentVisitors = new HashSet<>();
     // per-player stats
     private final Map<String, PlayerStats> playerStats = new HashMap<>();
 
@@ -64,6 +67,7 @@ public class TownManager {
         if (!townsDir.exists()) townsDir.mkdirs();
         this.historyFile = new File(plugin.getDataFolder(), "history.json");
         this.statsFile = new File(plugin.getDataFolder(), "player-stats.json");
+        this.silentVisitFile = new File(plugin.getDataFolder(), "silent-visitors.json");
         this.gson = new GsonBuilder().setPrettyPrinting().create();
     }
 
@@ -385,6 +389,28 @@ public class TownManager {
         return playerStats.getOrDefault(player.toString(), new PlayerStats());
     }
 
+    public boolean toggleSilentVisit(UUID player) {
+        boolean enabled;
+        if (silentVisitors.remove(player)) {
+            enabled = false;
+        } else {
+            silentVisitors.add(player);
+            enabled = true;
+        }
+        saveSilentVisitors();
+        return enabled;
+    }
+
+    public boolean isSilentVisitor(UUID player) {
+        return silentVisitors.contains(player);
+    }
+
+    public void setSilentVisit(UUID player, boolean enabled) {
+        if (enabled) silentVisitors.add(player);
+        else silentVisitors.remove(player);
+        saveSilentVisitors();
+    }
+
     public List<Town> topByClaims(int limit) {
         return townsByOwner.values().stream()
                 .sorted(Comparator.comparingInt(Town::claimCount).reversed()
@@ -428,6 +454,7 @@ public class TownManager {
         for (Town t : townsByOwner.values()) saveTown(t);
         saveHistory();
         saveStats();
+        saveSilentVisitors();
     }
 
     public void loadAll() {
@@ -451,6 +478,7 @@ public class TownManager {
         }
         loadHistory();
         loadStats();
+        loadSilentVisitors();
         bootstrapHistoryForExistingClaims();
         refreshWarScoreboard();
         refreshLeaderboardScoreboard();
@@ -493,6 +521,26 @@ public class TownManager {
             gson.toJson(playerStats, writer);
         } catch (Exception ex) {
             plugin.getLogger().warning("Failed to save player stats: " + ex.getMessage());
+        }
+    }
+
+    private void loadSilentVisitors() {
+        silentVisitors.clear();
+        if (!silentVisitFile.exists()) return;
+        try (FileReader reader = new FileReader(silentVisitFile)) {
+            Type type = new TypeToken<Set<UUID>>(){}.getType();
+            Set<UUID> data = gson.fromJson(reader, type);
+            if (data != null) silentVisitors.addAll(data);
+        } catch (Exception ex) {
+            plugin.getLogger().warning("Failed to load silent visitors: " + ex.getMessage());
+        }
+    }
+
+    private void saveSilentVisitors() {
+        try (FileWriter writer = new FileWriter(silentVisitFile)) {
+            gson.toJson(silentVisitors, writer);
+        } catch (Exception ex) {
+            plugin.getLogger().warning("Failed to save silent visitors: " + ex.getMessage());
         }
     }
 
