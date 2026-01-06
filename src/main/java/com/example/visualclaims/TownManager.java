@@ -25,6 +25,7 @@ public class TownManager {
     private final DynmapHook dynmap;
     private final File townsDir;
     private final File historyFile;
+    private final File statsFile;
     private final Gson gson;
 
     private static final int HISTORY_LIMIT = 10;
@@ -45,11 +46,16 @@ public class TownManager {
     private final Map<String, List<ChunkHistoryEntry>> chunkHistory = new HashMap<>();
     // players who disabled the war scoreboard
     private final Set<UUID> scoreboardDisabled = new HashSet<>();
+    // players who enabled the leaderboard scoreboard
+    private final Set<UUID> leaderboardViewers = new HashSet<>();
+    // per-player stats
+    private final Map<String, PlayerStats> playerStats = new HashMap<>();
 
     private boolean warModeEnabled = false;
 
     private Scoreboard warBoard;
     private Objective warObjective;
+    private final Map<UUID, Scoreboard> leaderboardBoards = new HashMap<>();
 
     public TownManager(VisualClaims plugin, DynmapHook dynmap) {
         this.plugin = plugin;
@@ -57,6 +63,7 @@ public class TownManager {
         this.townsDir = new File(plugin.getDataFolder(), "towns");
         if (!townsDir.exists()) townsDir.mkdirs();
         this.historyFile = new File(plugin.getDataFolder(), "history.json");
+        this.statsFile = new File(plugin.getDataFolder(), "player-stats.json");
         this.gson = new GsonBuilder().setPrettyPrinting().create();
     }
 
@@ -86,6 +93,7 @@ public class TownManager {
         indexTown(t);
         saveTown(t);
         refreshWarScoreboard();
+        refreshLeaderboardScoreboard();
         return true;
     }
 
@@ -109,6 +117,7 @@ public class TownManager {
         File f = new File(townsDir, owner.toString() + ".json");
         if (f.exists()) f.delete();
         refreshWarScoreboard();
+        refreshLeaderboardScoreboard();
         return true;
     }
 
@@ -137,10 +146,15 @@ public class TownManager {
         File f = new File(townsDir, owner.toString() + ".json");
         if (f.exists()) f.delete();
         refreshWarScoreboard();
+        refreshLeaderboardScoreboard();
         return true;
     }
 
     public boolean claimChunk(Town t, Chunk chunk, boolean bypass) {
+        return claimChunk(t, chunk, bypass, null);
+    }
+
+    public boolean claimChunk(Town t, Chunk chunk, boolean bypass, UUID actor) {
         if (t == null) return false;
         if (!bypass && t.claimCount() >= computeMaxClaims(t.getOwner())) return false;
         ChunkPos pos = ChunkPos.of(chunk);
@@ -149,8 +163,10 @@ public class TownManager {
         if (!ok) return false;
         townsByChunkId.put(pos.id(), t);
         saveTown(t);
+        if (actor != null) recordPlayerClaim(actor);
         if (dynmap != null) dynmap.addOrUpdateChunkArea(t, pos);
         recordHistory(pos, "CLAIM", t);
+        refreshLeaderboardScoreboard();
         return true;
     }
 
@@ -163,6 +179,7 @@ public class TownManager {
         saveTown(t);
         recordHistory(pos, "UNCLAIM", t);
         if (dynmap != null) dynmap.removeAreaMarker(pos);
+        refreshLeaderboardScoreboard();
         return true;
     }
 
@@ -174,6 +191,7 @@ public class TownManager {
             saveTown(t);
             recordHistory(pos, "FORCE-UNCLAIM", t);
             if (dynmap != null) dynmap.removeAreaMarker(pos);
+            refreshLeaderboardScoreboard();
             return true;
         }
         return false;
@@ -329,6 +347,62 @@ public class TownManager {
         return true;
     }
 
+    public void recordKill(UUID killer) {
+        recordPlayerKill(killer);
+        Optional<Town> townOpt = getTownOf(killer);
+        if (townOpt.isPresent()) {
+            Town t = townOpt.get();
+            t.addKill();
+            saveTown(t);
+        }
+        refreshLeaderboardScoreboard();
+    }
+
+    public void recordDeath(UUID victim) {
+        recordPlayerDeath(victim);
+        refreshLeaderboardScoreboard();
+    }
+
+    public void recordPlayerKill(UUID player) {
+        PlayerStats stats = playerStats.computeIfAbsent(player.toString(), k -> new PlayerStats());
+        stats.kills++;
+        saveStats();
+    }
+
+    public void recordPlayerDeath(UUID player) {
+        PlayerStats stats = playerStats.computeIfAbsent(player.toString(), k -> new PlayerStats());
+        stats.deaths++;
+        saveStats();
+    }
+
+    public void recordPlayerClaim(UUID player) {
+        PlayerStats stats = playerStats.computeIfAbsent(player.toString(), k -> new PlayerStats());
+        stats.claims++;
+        saveStats();
+    }
+
+    public PlayerStats getPlayerStats(UUID player) {
+        return playerStats.getOrDefault(player.toString(), new PlayerStats());
+    }
+
+    public List<Town> topByClaims(int limit) {
+        return townsByOwner.values().stream()
+                .sorted(Comparator.comparingInt(Town::claimCount).reversed()
+                        .thenComparing(Town::getName, Comparator.nullsLast(String::compareToIgnoreCase))
+                        .thenComparing(t -> t.getOwner().toString()))
+                .limit(limit)
+                .toList();
+    }
+
+    public List<Town> topByKills(int limit) {
+        return townsByOwner.values().stream()
+                .sorted(Comparator.comparingInt(Town::getKills).reversed()
+                        .thenComparing(Town::getName, Comparator.nullsLast(String::compareToIgnoreCase))
+                        .thenComparing(t -> t.getOwner().toString()))
+                .limit(limit)
+                .toList();
+    }
+
     private void indexTown(Town t) {
         townsByMember.put(t.getOwner(), t);
         if (t.getMembers() != null) {
@@ -353,6 +427,7 @@ public class TownManager {
     public void saveAll() {
         for (Town t : townsByOwner.values()) saveTown(t);
         saveHistory();
+        saveStats();
     }
 
     public void loadAll() {
@@ -375,8 +450,10 @@ public class TownManager {
             }
         }
         loadHistory();
+        loadStats();
         bootstrapHistoryForExistingClaims();
         refreshWarScoreboard();
+        refreshLeaderboardScoreboard();
     }
 
     private void loadHistory() {
@@ -396,6 +473,26 @@ public class TownManager {
             gson.toJson(chunkHistory, writer);
         } catch (Exception ex) {
             plugin.getLogger().warning("Failed to save history: " + ex.getMessage());
+        }
+    }
+
+    private void loadStats() {
+        playerStats.clear();
+        if (!statsFile.exists()) return;
+        try (FileReader reader = new FileReader(statsFile)) {
+            Type type = new TypeToken<Map<String, PlayerStats>>(){}.getType();
+            Map<String, PlayerStats> data = gson.fromJson(reader, type);
+            if (data != null) playerStats.putAll(data);
+        } catch (Exception ex) {
+            plugin.getLogger().warning("Failed to load player stats: " + ex.getMessage());
+        }
+    }
+
+    public void saveStats() {
+        try (FileWriter writer = new FileWriter(statsFile)) {
+            gson.toJson(playerStats, writer);
+        } catch (Exception ex) {
+            plugin.getLogger().warning("Failed to save player stats: " + ex.getMessage());
         }
     }
 
@@ -458,10 +555,9 @@ public class TownManager {
         if (mgr == null) return;
 
         if (!warModeEnabled) {
-            Scoreboard main = mgr.getMainScoreboard();
-            for (Player p : Bukkit.getOnlinePlayers()) p.setScoreboard(main);
             warBoard = null;
             warObjective = null;
+            for (Player p : Bukkit.getOnlinePlayers()) applyScoreboard(p);
             return;
         }
 
@@ -469,10 +565,9 @@ public class TownManager {
         List<String> allies = buildAllianceLines();
 
         if (wars.isEmpty()) {
-            Scoreboard main = mgr.getMainScoreboard();
-            for (Player p : Bukkit.getOnlinePlayers()) p.setScoreboard(main);
             warBoard = null;
             warObjective = null;
+            for (Player p : Bukkit.getOnlinePlayers()) applyScoreboard(p);
             return;
         }
 
@@ -507,17 +602,103 @@ public class TownManager {
         warBoard = board;
         warObjective = obj;
         for (Player p : Bukkit.getOnlinePlayers()) {
-            p.setScoreboard(board);
+            applyScoreboard(p);
         }
     }
 
     public void applyScoreboard(Player p) {
-        if (warBoard != null && warModeEnabled && !scoreboardDisabled.contains(p.getUniqueId())) {
-            p.setScoreboard(warBoard);
-        } else {
-            ScoreboardManager mgr = Bukkit.getScoreboardManager();
-            if (mgr != null) p.setScoreboard(mgr.getMainScoreboard());
+        ScoreboardManager mgr = Bukkit.getScoreboardManager();
+        UUID id = p.getUniqueId();
+        if (leaderboardViewers.contains(id)) {
+            if (mgr != null && !leaderboardBoards.containsKey(id)) refreshLeaderboardScoreboard();
+            Scoreboard lb = leaderboardBoards.get(id);
+            if (lb != null) { p.setScoreboard(lb); return; }
         }
+        if (warBoard != null && warModeEnabled && !scoreboardDisabled.contains(id)) {
+            p.setScoreboard(warBoard);
+        } else if (mgr != null) {
+            p.setScoreboard(mgr.getMainScoreboard());
+        }
+    }
+
+    public boolean toggleLeaderboardScoreboard(UUID player) {
+        if (leaderboardViewers.remove(player)) {
+            leaderboardBoards.remove(player);
+            Player p = Bukkit.getPlayer(player);
+            if (p != null) applyScoreboard(p);
+            return false;
+        }
+        leaderboardViewers.add(player);
+        refreshLeaderboardScoreboard();
+        Player p = Bukkit.getPlayer(player);
+        if (p != null) applyScoreboard(p);
+        return true;
+    }
+
+    public void refreshLeaderboardScoreboard() {
+        ScoreboardManager mgr = Bukkit.getScoreboardManager();
+        if (mgr == null) return;
+        if (leaderboardViewers.isEmpty()) {
+            leaderboardBoards.clear();
+            return;
+        }
+
+        List<Town> killsTop = topByKills(3);
+        List<Town> claimsTop = topByClaims(3);
+
+        for (UUID viewer : new HashSet<>(leaderboardViewers)) {
+            Scoreboard board = buildLeaderboardBoard(mgr, viewer, killsTop, claimsTop);
+            leaderboardBoards.put(viewer, board);
+            Player p = Bukkit.getPlayer(viewer);
+            if (p != null && p.isOnline()) p.setScoreboard(board);
+        }
+    }
+
+    private Scoreboard buildLeaderboardBoard(ScoreboardManager mgr, UUID viewer, List<Town> killsTop, List<Town> claimsTop) {
+        Scoreboard board = mgr.getNewScoreboard();
+        Objective obj = board.registerNewObjective("vc_leaders", "dummy", ChatColor.GOLD + "" + ChatColor.BOLD + "Town Leaders");
+        obj.setDisplaySlot(DisplaySlot.SIDEBAR);
+
+        int score = 15;
+        obj.getScore(ChatColor.AQUA + "Top Kills").setScore(score--);
+        if (killsTop.isEmpty()) {
+            obj.getScore(ChatColor.GRAY + "None").setScore(score--);
+        } else {
+            int idx = 1;
+            for (Town t : killsTop) {
+                if (score < 1) break;
+                String line = ChatColor.WHITE + "" + idx + ". " + coloredTownName(t) + ChatColor.GRAY + " (" + t.getKills() + ")" + ChatColor.DARK_GRAY + " k" + idx;
+                obj.getScore(line).setScore(score--);
+                idx++;
+            }
+        }
+
+        obj.getScore(ChatColor.YELLOW + "Top Claims").setScore(score--);
+        if (claimsTop.isEmpty()) {
+            obj.getScore(ChatColor.GRAY + "None").setScore(score--);
+        } else {
+            int idx = 1;
+            for (Town t : claimsTop) {
+                if (score < 1) break;
+                String line = ChatColor.WHITE + "" + idx + ". " + coloredTownName(t) + ChatColor.GRAY + " (" + t.claimCount() + ")" + ChatColor.DARK_GRAY + " c" + idx;
+                obj.getScore(line).setScore(score--);
+                idx++;
+            }
+        }
+
+        // Player personal stats
+        PlayerStats stats = getPlayerStats(viewer);
+        obj.getScore(ChatColor.GRAY + "----------------" + ChatColor.DARK_GRAY + " sep").setScore(score--);
+        obj.getScore(ChatColor.GREEN + "You").setScore(score--);
+        obj.getScore(playerStatLine("Kills", stats.getKills(), "yk")).setScore(score--);
+        obj.getScore(playerStatLine("Deaths", stats.getDeaths(), "yd")).setScore(score--);
+        obj.getScore(playerStatLine("Claims", stats.getClaims(), "yc")).setScore(score--);
+
+        return board;
+    }
+
+    private String playerStatLine(String label, int value, String code) {
+        return ChatColor.WHITE + label + ": " + ChatColor.YELLOW + value + ChatColor.DARK_GRAY + " " + code;
     }
 
     private String townLabel(Town t) {
@@ -583,10 +764,7 @@ public class TownManager {
         } else {
             scoreboardDisabled.add(player);
             Player p = Bukkit.getPlayer(player);
-            if (p != null) {
-                ScoreboardManager mgr = Bukkit.getScoreboardManager();
-                if (mgr != null) p.setScoreboard(mgr.getMainScoreboard());
-            }
+            if (p != null) applyScoreboard(p);
             return false;
         }
     }
@@ -637,5 +815,15 @@ public class TownManager {
                 }
             }
         }
+    }
+
+    public static class PlayerStats {
+        private int kills = 0;
+        private int deaths = 0;
+        private int claims = 0;
+
+        public int getKills() { return kills; }
+        public int getDeaths() { return deaths; }
+        public int getClaims() { return claims; }
     }
 }

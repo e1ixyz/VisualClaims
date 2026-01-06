@@ -17,6 +17,7 @@ public class Town {
     private Set<UUID> allies = new HashSet<>();
     private Set<UUID> wars = new HashSet<>();
     private int bonusChunks = 0; // manual adjustments
+    private int kills = 0; // tracked town kills
 
     // For Gson
     public Town() {}
@@ -61,4 +62,8 @@ public class Town {
     public void removeAlly(UUID ownerId) { allies.remove(ownerId); }
     public void addWar(UUID ownerId) { wars.add(ownerId); }
     public void removeWar(UUID ownerId) { wars.remove(ownerId); }
+
+    public int getKills() { return kills; }
+    public void addKill() { this.kills++; }
+    public void setKills(int kills) { this.kills = kills; }
 }

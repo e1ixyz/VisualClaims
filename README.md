@@ -9,6 +9,7 @@ VisualClaims is a Paper/Spigot plugin that lets players found towns, invite frie
 - Public town listings show descriptions, members, alliances, wars, and claim counts.
 - Chunk history keeps a log of who claimed a spot and what alliances/wars were active at the time.
 - Server-wide war mode shows a live scoreboard of wars/alliances, with per-player scoreboard toggles.
+- Town leaderboard highlights leaders by claims and kills, viewable in chat or via a sidebar toggle.
 - Territory entry notifications alert town members/owners when someone enters their land.
 - Store towns as JSON on disk for safe restarts and easy editing.
 - Simple permission scheme with an admin bypass for moderators and test servers.
@@ -73,6 +74,7 @@ line-weight: 2
 | `/unclaim` | Unclaim the current chunk (admins can force-unclaim). | `visclaims.unclaim` | true |
 | `/autoclaim` | Toggle automatic claiming while you walk. | `visclaims.autoclaim` | true |
 | `/autohistory` | Toggle automatic chunk history popups while you walk. | `visclaims.autohistory` | true |
+| `/leaderboard [toggle]` | Show top towns by claims/kills in chat or toggle the sidebar leaderboard. | `visclaims.leaderboard` | true |
 | `/claimalerts` | Toggle the chat messages when you enter or leave claimed chunks. | `visclaims.claimalerts` | true |
 | `/silentvisit` | Toggle silently entering other players' towns (no alerts sent to them). | `visclaims.silentvisit` | op |
 | `/settownname <name>` | Rename your town. | `visclaims.setname` | true |
@@ -122,6 +124,7 @@ Playtime scaling reads the built-in `Statistic.PLAY_ONE_MINUTE` (same counter us
 - Autoclaim only works if you already own a town and are inside unclaimed territory. You will receive feedback if you hit the chunk cap or collide with another town's claim.
 - Movement messages fire whenever you cross chunk boundaries—whether you walk or teleport—so players always know when they enter or leave a town.
 - Use `/claimalerts` to mute your personal enter/leave messages. Staff (or anyone with `visclaims.silentvisit`) can toggle `/silentvisit` to avoid alerting other towns when passing through their land.
+- `/leaderboard` (alias `/lb`) shows the top 3 towns by kills, then claims, plus your own kills/deaths/claims. Add `toggle` to enable a persistent sidebar.
 
 ## Gallery
 

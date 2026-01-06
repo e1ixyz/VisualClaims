@@ -8,6 +8,7 @@ public class VisualClaims extends JavaPlugin {
     private TownManager townManager;
     private DynmapHook dynmapHook;
     private MoveListener moveListener;
+    private CombatListener combatListener;
 
     @Override
     public void onEnable() {
@@ -55,12 +56,15 @@ public class VisualClaims extends JavaPlugin {
         getCommand("warscoreboard").setExecutor(handler);
         getCommand("claimadmin").setExecutor(handler);
         getCommand("admindeletetown").setExecutor(handler);
+        getCommand("leaderboard").setExecutor(handler);
         getCommand("claimalerts").setExecutor(handler);
         getCommand("silentvisit").setExecutor(handler);
 
         // Move listener
         moveListener = new MoveListener(this, townManager);
         Bukkit.getPluginManager().registerEvents(moveListener, this);
+        combatListener = new CombatListener(townManager);
+        Bukkit.getPluginManager().registerEvents(combatListener, this);
 
         getLogger().info("VisualClaims enabled.");
     }
@@ -77,4 +81,5 @@ public class VisualClaims extends JavaPlugin {
     public DynmapHook getDynmapHook() { return dynmapHook; }
     public TownManager getTownManager() { return townManager; }
     public MoveListener getMoveListener() { return moveListener; }
+    public CombatListener getCombatListener() { return combatListener; }
 }

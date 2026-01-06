@@ -149,7 +149,7 @@ public class MoveListener implements Listener {
         Town t = townOpt.get();
         int max = townManager.computeMaxClaims(t.getOwner());
         boolean bypass = p.hasPermission("visclaims.admin");
-        boolean ok = townManager.claimChunk(t, to, bypass);
+        boolean ok = townManager.claimChunk(t, to, bypass, p.getUniqueId());
         if (ok) {
             p.sendMessage("§aAuto-claimed chunk (" + to.getX() + ", " + to.getZ() + ")");
         } else if (!bypass && townOpt.get().claimCount() >= max) {

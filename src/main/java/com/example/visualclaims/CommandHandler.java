@@ -52,6 +52,8 @@ public class CommandHandler implements CommandExecutor {
             case "adjustclaims": return adjustClaims(p, args);
             case "claimalerts": return toggleClaimAlerts(p);
             case "silentvisit": return toggleSilentVisit(p);
+            case "leaderboard":
+            case "lb": return leaderboardCommand(p, args);
             case "towninvite": return inviteToTown(p, args);
             case "jointown": return joinTown(p, args);
             case "townmembers": return showTownMembers(p);
@@ -125,7 +127,7 @@ public class CommandHandler implements CommandExecutor {
         boolean bypass = p.hasPermission("visclaims.admin");
         Town town = tOpt.get();
         int max = towns.computeMaxClaims(town.getOwner());
-        boolean ok = towns.claimChunk(town, c, bypass);
+        boolean ok = towns.claimChunk(town, c, bypass, p.getUniqueId());
         if (ok) {
             p.sendMessage("§aClaimed chunk at §e(" + c.getX() + ", " + c.getZ() + ")");
         } else {
@@ -203,6 +205,7 @@ public class CommandHandler implements CommandExecutor {
         t.setName(newName);
         towns.saveTown(t);
         if (plugin.getDynmapHook() != null) plugin.getDynmapHook().refreshTownAreas(t);
+        towns.refreshLeaderboardScoreboard();
         p.sendMessage("§aTown renamed to " + towns.coloredTownName(t));
         return true;
     }
@@ -230,6 +233,7 @@ public class CommandHandler implements CommandExecutor {
         t.setColor(c);
         towns.saveTown(t);
         if (plugin.getDynmapHook() != null) plugin.getDynmapHook().refreshTownAreas(t);
+        towns.refreshLeaderboardScoreboard();
         p.sendMessage("§aTown color set to §e" + c.name());
         return true;
     }
@@ -364,6 +368,7 @@ public class CommandHandler implements CommandExecutor {
         p.sendMessage("§f/autohistory §7- Toggle automatic chunk history feed");
         p.sendMessage("§f/claimalerts §7- Toggle your own entering/leaving messages");
         p.sendMessage("§f/silentvisit §7- Toggle silent entries into other towns (permission)");
+        p.sendMessage("§f/leaderboard [toggle] §7- View leaderboard or toggle the sidebar");
         p.sendMessage("§f/settownname <name> §7- Rename your town");
         p.sendMessage("§f/settowncolor <color> §7- Change your town's color");
         p.sendMessage("§f/settowndesc <text> §7- Set your town description");
@@ -610,6 +615,48 @@ public class CommandHandler implements CommandExecutor {
         }
         boolean silent = plugin.getMoveListener().toggleSilentVisits(p.getUniqueId());
         p.sendMessage(silent ? "§aSilent visiting enabled. Towns will not be alerted when you enter their land." : "§cSilent visiting disabled. Towns will be alerted when you enter their land.");
+        return true;
+    }
+
+    private boolean leaderboardCommand(Player p, String[] args) {
+        if (!p.hasPermission("visclaims.leaderboard")) {
+            p.sendMessage("§cNo permission.");
+            return true;
+        }
+        if (args.length > 0 && (args[0].equalsIgnoreCase("toggle") || args[0].equalsIgnoreCase("scoreboard") || args[0].equalsIgnoreCase("sb"))) {
+            boolean enabled = towns.toggleLeaderboardScoreboard(p.getUniqueId());
+            p.sendMessage(enabled ? "§aLeaderboard scoreboard enabled." : "§cLeaderboard scoreboard disabled.");
+            return true;
+        }
+        List<Town> topKills = towns.topByKills(3);
+        List<Town> topClaims = towns.topByClaims(3);
+
+        p.sendMessage("§e--- Town Leaderboard ---");
+        p.sendMessage("§bTop Kills:");
+        if (topKills.isEmpty()) {
+            p.sendMessage("  §7None yet.");
+        } else {
+            int idx = 1;
+            for (Town t : topKills) {
+                p.sendMessage("  §7" + idx + ". §f" + towns.coloredTownName(t) + " §7- §e" + t.getKills() + " §7kills");
+                idx++;
+            }
+        }
+
+        p.sendMessage("§6Top Claims:");
+        if (topClaims.isEmpty()) {
+            p.sendMessage("  §7None yet.");
+        } else {
+            int idx = 1;
+            for (Town t : topClaims) {
+                p.sendMessage("  §7" + idx + ". §f" + towns.coloredTownName(t) + " §7- §e" + t.claimCount() + " §7claims");
+                idx++;
+            }
+        }
+
+        TownManager.PlayerStats stats = towns.getPlayerStats(p.getUniqueId());
+        p.sendMessage("§aYour Stats: §fKills §e" + stats.getKills() + " §7/ §fDeaths §e" + stats.getDeaths() + " §7/ §fClaims §e" + stats.getClaims());
+        p.sendMessage("§7Use §e/leaderboard toggle §7to enable the sidebar.");
         return true;
     }
 

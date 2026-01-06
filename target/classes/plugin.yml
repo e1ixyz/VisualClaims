@@ -50,6 +50,11 @@ commands:
     description: Root command for claim help
     usage: /claim help
     permission: visclaims.help
+  leaderboard:
+    description: View town leaderboard or toggle the leaderboard scoreboard
+    usage: /leaderboard [toggle]
+    permission: visclaims.leaderboard
+    aliases: [lb]
   claimalerts:
     description: Toggle receiving claim enter/leave messages
     usage: /claimalerts
@@ -152,6 +157,9 @@ permissions:
     default: true
   visclaims.help:
     description: Allows using /claim help to view all claim commands
+    default: true
+  visclaims.leaderboard:
+    description: Allows viewing leaderboard and toggling the leaderboard scoreboard
     default: true
   visclaims.claimalerts:
     description: Allows toggling claim entry/exit alerts
