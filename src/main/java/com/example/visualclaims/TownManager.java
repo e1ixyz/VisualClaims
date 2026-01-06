@@ -46,8 +46,8 @@ public class TownManager {
     private final Map<String, List<ChunkHistoryEntry>> chunkHistory = new HashMap<>();
     // players who disabled the war scoreboard
     private final Set<UUID> scoreboardDisabled = new HashSet<>();
-    // players who enabled the leaderboard scoreboard
-    private final Set<UUID> leaderboardViewers = new HashSet<>();
+    // players who disabled the leaderboard scoreboard
+    private final Set<UUID> leaderboardDisabled = new HashSet<>();
     // per-player stats
     private final Map<String, PlayerStats> playerStats = new HashMap<>();
 
@@ -609,7 +609,7 @@ public class TownManager {
     public void applyScoreboard(Player p) {
         ScoreboardManager mgr = Bukkit.getScoreboardManager();
         UUID id = p.getUniqueId();
-        if (leaderboardViewers.contains(id)) {
+        if (!leaderboardDisabled.contains(id)) {
             if (mgr != null && !leaderboardBoards.containsKey(id)) refreshLeaderboardScoreboard();
             Scoreboard lb = leaderboardBoards.get(id);
             if (lb != null) { p.setScoreboard(lb); return; }
@@ -622,41 +622,40 @@ public class TownManager {
     }
 
     public boolean toggleLeaderboardScoreboard(UUID player) {
-        if (leaderboardViewers.remove(player)) {
-            leaderboardBoards.remove(player);
+        if (leaderboardDisabled.remove(player)) {
+            refreshLeaderboardScoreboard();
             Player p = Bukkit.getPlayer(player);
             if (p != null) applyScoreboard(p);
-            return false;
+            return true;
         }
-        leaderboardViewers.add(player);
-        refreshLeaderboardScoreboard();
+        leaderboardDisabled.add(player);
+        leaderboardBoards.remove(player);
         Player p = Bukkit.getPlayer(player);
         if (p != null) applyScoreboard(p);
-        return true;
+        return false;
     }
 
     public void refreshLeaderboardScoreboard() {
         ScoreboardManager mgr = Bukkit.getScoreboardManager();
         if (mgr == null) return;
-        if (leaderboardViewers.isEmpty()) {
-            leaderboardBoards.clear();
-            return;
-        }
 
         List<Town> killsTop = topByKills(3);
         List<Town> claimsTop = topByClaims(3);
 
-        for (UUID viewer : new HashSet<>(leaderboardViewers)) {
+        leaderboardBoards.entrySet().removeIf(e -> leaderboardDisabled.contains(e.getKey()));
+
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            UUID viewer = online.getUniqueId();
+            if (leaderboardDisabled.contains(viewer)) continue;
             Scoreboard board = buildLeaderboardBoard(mgr, viewer, killsTop, claimsTop);
             leaderboardBoards.put(viewer, board);
-            Player p = Bukkit.getPlayer(viewer);
-            if (p != null && p.isOnline()) p.setScoreboard(board);
+            online.setScoreboard(board);
         }
     }
 
     private Scoreboard buildLeaderboardBoard(ScoreboardManager mgr, UUID viewer, List<Town> killsTop, List<Town> claimsTop) {
         Scoreboard board = mgr.getNewScoreboard();
-        Objective obj = board.registerNewObjective("vc_leaders", "dummy", ChatColor.GOLD + "" + ChatColor.BOLD + "Town Leaders");
+        Objective obj = board.registerNewObjective("vc_leaders", "dummy", ChatColor.GOLD + "" + ChatColor.BOLD + "Leaderboard");
         obj.setDisplaySlot(DisplaySlot.SIDEBAR);
 
         int score = 15;
@@ -693,6 +692,7 @@ public class TownManager {
         obj.getScore(playerStatLine("Kills", stats.getKills(), "yk")).setScore(score--);
         obj.getScore(playerStatLine("Deaths", stats.getDeaths(), "yd")).setScore(score--);
         obj.getScore(playerStatLine("Claims", stats.getClaims(), "yc")).setScore(score--);
+        obj.getScore(ChatColor.GRAY + "Hide: /lb toggle" + ChatColor.DARK_GRAY + " tip").setScore(score--);
 
         return board;
     }
