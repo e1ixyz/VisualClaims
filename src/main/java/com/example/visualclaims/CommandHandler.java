@@ -56,6 +56,7 @@ public class CommandHandler implements CommandExecutor {
             case "leaderboard":
             case "lb": return leaderboardCommand(p, args);
             case "claimreload": return reloadPlugin(p);
+            case "trimoutposts": return trimOutposts(p, args);
             case "towninvite": return inviteToTown(p, args);
             case "jointown": return joinTown(p, args);
             case "townmembers": return showTownMembers(p);
@@ -395,6 +396,7 @@ public class CommandHandler implements CommandExecutor {
             p.sendMessage("§f/warscoreboard §7- Toggle your war scoreboard view");
             p.sendMessage("§f/admindeletetown <town> §7- Delete a town by name/owner");
             p.sendMessage("§f/unclaim §7(with visclaims.admin) - Force unclaim any chunk");
+            p.sendMessage("§f/trimoutposts <player> [count] §7- Remove the smallest outpost clusters for a player");
             return true;
         }
         p.sendMessage("§e--- Claim Commands ---");
@@ -409,6 +411,7 @@ public class CommandHandler implements CommandExecutor {
         p.sendMessage("§f/silentvisit §7- Toggle silent entries into other towns (permission)");
         p.sendMessage("§f/leaderboard [toggle] §7- View leaderboard or toggle the sidebar");
         p.sendMessage("§f/claimreload §7- Admin: reload VisualClaims config/data");
+        p.sendMessage("§f/trimoutposts <player> [count] §7- Admin: remove smallest outposts");
         p.sendMessage("§f/settownname <name> §7- Rename your town");
         p.sendMessage("§f/settowncolor <color> §7- Change your town's color");
         p.sendMessage("§f/settowndesc <text> §7- Set your town description");
@@ -682,6 +685,36 @@ public class CommandHandler implements CommandExecutor {
         return true;
     }
 
+    private boolean trimOutposts(Player p, String[] args) {
+        if (!p.hasPermission("visclaims.admin")) {
+            p.sendMessage("§cNo permission.");
+            return true;
+        }
+        if (args.length < 1 || args.length > 2) {
+            p.sendMessage("Usage: /trimoutposts <player> [count]");
+            return true;
+        }
+        var target = plugin.getServer().getOfflinePlayer(args[0]);
+        UUID targetId = target.getUniqueId();
+        if (targetId == null) {
+            p.sendMessage("§cUnknown player.");
+            return true;
+        }
+        int count = 1;
+        if (args.length == 2) {
+            try {
+                count = Math.max(1, Integer.parseInt(args[1]));
+            } catch (NumberFormatException ex) {
+                p.sendMessage("§cCount must be a number.");
+                return true;
+            }
+        }
+        TownManager.RemovalResult res = towns.trimSmallestOutposts(targetId, count);
+        String name = target.getName() != null ? target.getName() : args[0];
+        p.sendMessage("§eTrimmed §f" + res.clusters() + " §eoutpost(s) for §f" + name + " §e(removed §f" + res.chunks() + " §echunk(s)).");
+        return true;
+    }
+
     private boolean leaderboardCommand(Player p, String[] args) {
         if (!p.hasPermission("visclaims.leaderboard")) {
             p.sendMessage("§cNo permission.");
@@ -719,7 +752,8 @@ public class CommandHandler implements CommandExecutor {
         }
 
         TownManager.PlayerStats stats = towns.getPlayerStats(p.getUniqueId());
-        p.sendMessage("§aYour Stats: §fKills §e" + stats.getKills() + " §7/ §fDeaths §e" + stats.getDeaths() + " §7/ §fClaims §e" + stats.getClaims());
+        int townClaims = towns.getTownOf(p.getUniqueId()).map(Town::claimCount).orElse(stats.getClaims());
+        p.sendMessage("§aYour Stats: §fKills §e" + stats.getKills() + " §7/ §fDeaths §e" + stats.getDeaths() + " §7/ §fClaims §e" + townClaims);
         p.sendMessage("§7Use §e/leaderboard toggle §7to enable the sidebar.");
         return true;
     }

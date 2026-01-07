@@ -342,12 +342,11 @@ public class TownManager {
         int baseMax = plugin.getConfig().getInt("max-claims-per-player", 64);
         int bonus = (t != null) ? t.getBonusChunks() : 0;
         int theoretical = Math.max(1, computeTheoreticalClaims(owner, baseMax, bonus));
-        // Diminishing growth: start at 3 outposts around 512 claims and asymptotically approach 9 outposts.
+        // Diminishing-but-unbounded growth: start at ~3 outposts near 512 claims and grow sub-linearly via a log curve.
         double ratio = Math.max(1.0d, theoretical / 512.0d);
         double baseOutposts = 3.0d;
-        double maxOutposts = 9.0d;
-        double k = 0.6d; // growth rate
-        double allowed = baseOutposts + (maxOutposts - baseOutposts) * (1.0d - Math.exp(-k * (ratio - 1.0d)));
+        double growth = Math.log(ratio) / Math.log(1.3d); // generous early growth, slower later
+        double allowed = baseOutposts + growth;
         return Math.max(1, (int) Math.round(allowed));
     }
 
@@ -411,6 +410,57 @@ public class TownManager {
         boolean adjacent = isAdjacentToOwnClaim(town, pos);
         return !adjacent && current >= allowed;
     }
+
+    public List<Set<ChunkPos>> getClaimIslands(Town town) {
+        List<Set<ChunkPos>> clusters = new ArrayList<>();
+        if (town == null || town.getClaims() == null || town.getClaims().isEmpty()) return clusters;
+        Set<ChunkPos> claims = new HashSet<>(town.getClaims());
+        Set<ChunkPos> visited = new HashSet<>();
+        for (ChunkPos start : claims) {
+            if (visited.contains(start)) continue;
+            Set<ChunkPos> cluster = new HashSet<>();
+            Deque<ChunkPos> stack = new ArrayDeque<>();
+            stack.push(start);
+            while (!stack.isEmpty()) {
+                ChunkPos cur = stack.pop();
+                if (!visited.add(cur)) continue;
+                cluster.add(cur);
+                int x = cur.getX();
+                int z = cur.getZ();
+                String world = cur.getWorld();
+                int[][] dirs = { {1,0}, {-1,0}, {0,1}, {0,-1} };
+                for (int[] d : dirs) {
+                    ChunkPos neighbor = new ChunkPos(world, x + d[0], z + d[1]);
+                    if (claims.contains(neighbor) && !visited.contains(neighbor)) {
+                        stack.push(neighbor);
+                    }
+                }
+            }
+            clusters.add(cluster);
+        }
+        return clusters;
+    }
+
+    public RemovalResult trimSmallestOutposts(UUID owner, int clustersToRemove) {
+        Town t = townsByOwner.get(owner);
+        if (t == null || clustersToRemove <= 0) return new RemovalResult(0, 0);
+        List<Set<ChunkPos>> clusters = getClaimIslands(t);
+        clusters.sort(Comparator.comparingInt(Set::size));
+        int removedClusters = 0;
+        int removedChunks = 0;
+        for (Set<ChunkPos> cluster : clusters) {
+            if (removedClusters >= clustersToRemove) break;
+            for (ChunkPos pos : new ArrayList<>(cluster)) {
+                if (unclaimChunk(t, pos)) {
+                    removedChunks++;
+                }
+            }
+            removedClusters++;
+        }
+        return new RemovalResult(removedClusters, removedChunks);
+    }
+
+    public record RemovalResult(int clusters, int chunks) {}
 
     public boolean exceedsOutpostLimit(Town town, ChunkPos pos, boolean bypass) {
         if (bypass || town == null) return false;
@@ -830,11 +880,19 @@ public class TownManager {
 
         // Player personal stats
         PlayerStats stats = getPlayerStats(viewer);
+        int claimCount = getTownOf(viewer)
+                .map(Town::claimCount)
+                .orElseGet(() -> {
+                    for (Town t : townsByOwner.values()) {
+                        if (t.isMember(viewer)) return t.claimCount();
+                    }
+                    return stats.getClaims();
+                });
         obj.getScore(ChatColor.GRAY + "----------------" + ChatColor.DARK_GRAY + " sep").setScore(score--);
         obj.getScore(ChatColor.GREEN + "You").setScore(score--);
         obj.getScore(playerStatLine("Kills", stats.getKills(), "yk")).setScore(score--);
         obj.getScore(playerStatLine("Deaths", stats.getDeaths(), "yd")).setScore(score--);
-        obj.getScore(playerStatLine("Claims", stats.getClaims(), "yc")).setScore(score--);
+        obj.getScore(playerStatLine("Claims", claimCount, "yc")).setScore(score--);
         obj.getScore(ChatColor.GRAY + "Hide: /lb toggle" + ChatColor.DARK_GRAY + " tip").setScore(score--);
 
         return board;

@@ -71,6 +71,10 @@ commands:
     description: Reload VisualClaims config and data
     usage: /claimreload
     permission: visclaims.admin
+  trimoutposts:
+    description: Admin: remove smallest outpost clusters for a player
+    usage: /trimoutposts <player> [count]
+    permission: visclaims.admin
   claimlimit:
     description: Show playtime-based claim limit
     usage: /claimlimit [player]

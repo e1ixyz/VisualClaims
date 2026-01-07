@@ -79,6 +79,7 @@ line-weight: 2
 | `/claimalerts` | Toggle the chat messages when you enter or leave claimed chunks. | `visclaims.claimalerts` | true |
 | `/silentvisit` | Toggle silently entering other players' towns (no alerts sent to them). | `visclaims.silentvisit` | op |
 | `/claimreload` | Admin: reload VisualClaims config and data. | `visclaims.admin` | op |
+| `/trimoutposts <player> [count]` | Admin: remove the smallest outpost clusters for a player. | `visclaims.admin` | op |
 | `/settownname <name>` | Rename your town. | `visclaims.setname` | true |
 | `/settowncolor <color>` | Change the town colour (see list below). | `visclaims.setcolor` | true |
 | `/settowndesc <text>` | Set your town description. | `visclaims.setdesc` | true |
@@ -128,8 +129,9 @@ Playtime scaling reads the built-in `Statistic.PLAY_ONE_MINUTE` (same counter us
 - Movement messages fire whenever you cross chunk boundaries—whether you walk or teleport—so players always know when they enter or leave a town.
 - Use `/claimalerts` to mute your personal enter/leave messages. Staff (or anyone with `visclaims.silentvisit`) can toggle `/silentvisit` to avoid alerting other towns when passing through their land.
 - `/leaderboard` (alias `/lb`) shows the top 3 towns by kills, then claims, plus your own kills/deaths/claims. Add `toggle` to enable a persistent sidebar.
-- Outposts (non-contiguous claim clusters) are capped at roughly 1% of your theoretical claim limit with an exponential reduction as your cap grows. Your first claim is exempt, expansions of existing clusters are fine, and admins (`visclaims.admin`) bypass the cap. Existing outposts stay; the cap applies to creating new isolated clusters.
+- Outposts (non-contiguous claim clusters) follow a diminishing log curve: they start around 3 outposts near 512 claims and grow slowly as your claim cap rises. Your first claim is exempt, expansions of existing clusters are fine, and admins (`visclaims.admin`) bypass the cap. Existing outposts stay; the cap applies to creating new isolated clusters.
 - If you exceed your outpost cap, no new claims are allowed (including expansions) until you unclaim enough chunks to get back to or under your cap. `/claimlimit` shows your current/allowed outposts. `/autounclaim` can help shed land quickly.
+- `/trimoutposts <player> [count]` lets admins remove the smallest outpost clusters for a player if manual cleanup is needed.
 
 ## Gallery
 
