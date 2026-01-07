@@ -41,6 +41,7 @@ public class CommandHandler implements CommandExecutor {
             case "claimchunk": return claimChunk(p);
             case "unclaim": return unclaimChunk(p);
             case "autoclaim": return autoClaim(p);
+            case "autounclaim": return autoUnclaim(p);
             case "autohistory": return autoHistory(p);
             case "settownname": return setTownName(p, args);
             case "settowncolor": return setTownColor(p, args);
@@ -133,10 +134,14 @@ public class CommandHandler implements CommandExecutor {
         boolean bypass = p.hasPermission("visclaims.admin");
         Town town = tOpt.get();
         int max = towns.computeMaxClaims(town.getOwner());
-        if (towns.exceedsOutpostLimit(town, pos, bypass)) {
-            int allowed = towns.computeAllowedOutposts(town.getOwner());
-            int groups = towns.countClaimIslands(town);
-            p.sendMessage("§cCannot start a new outpost. Limit: §e" + allowed + "§c separate clusters; you already have §e" + groups + "§c. Expand an existing claim or increase your limit.");
+        int allowedOutposts = towns.computeAllowedOutposts(town.getOwner());
+        int currentOutposts = towns.countClaimIslands(town);
+        if (towns.isOverOutpostCap(town, bypass)) {
+            p.sendMessage("§cYou have §e" + currentOutposts + "§c outposts, but are allowed §e" + allowedOutposts + "§c. Unclaim to return to your cap before claiming more.");
+            return true;
+        }
+        if (towns.wouldExceedOutpostCap(town, pos, bypass)) {
+            p.sendMessage("§cOutpost cap reached: §e" + currentOutposts + "§c / §e" + allowedOutposts + "§c. Expand existing claims or unclaim to free a slot.");
             return true;
         }
         boolean ok = towns.claimChunk(town, c, bypass, p.getUniqueId());
@@ -328,7 +333,7 @@ public class CommandHandler implements CommandExecutor {
         p.sendMessage("§7Allowed total: §f" + theoretical + (overflow > 0 ? " §8(overflow by " + overflow + " grandfathered)" : ""));
         p.sendMessage("§7Claims held: §f" + claimed);
         p.sendMessage("§7Effective limit (never lowers below claims): §f" + limit);
-        p.sendMessage("§7Outposts (separate clusters): §f" + currentOutposts + " §7/ §f" + allowedOutposts + " §8(new isolated clusters blocked if over the cap)");
+        p.sendMessage("§7Outposts (separate clusters): §f" + currentOutposts + " §7/ §f" + allowedOutposts + " §8(first claim exempt; new isolated clusters blocked when over the cap; expansions allowed)");
         return true;
     }
 
@@ -398,6 +403,7 @@ public class CommandHandler implements CommandExecutor {
         p.sendMessage("§f/claimchunk §7- Claim the current chunk");
         p.sendMessage("§f/unclaim §7- Unclaim the current chunk");
         p.sendMessage("§f/autoclaim §7- Toggle autoclaim for chunks");
+        p.sendMessage("§f/autounclaim §7- Toggle auto-unclaim for owned chunks as you move");
         p.sendMessage("§f/autohistory §7- Toggle automatic chunk history feed");
         p.sendMessage("§f/claimalerts §7- Toggle your own entering/leaving messages");
         p.sendMessage("§f/silentvisit §7- Toggle silent entries into other towns (permission)");
@@ -636,6 +642,16 @@ public class CommandHandler implements CommandExecutor {
         }
         boolean now = plugin.getMoveListener().toggleAutohistory(p.getUniqueId());
         p.sendMessage(now ? "§aAutohistory enabled." : "§cAutohistory disabled.");
+        return true;
+    }
+
+    private boolean autoUnclaim(Player p) {
+        if (!p.hasPermission("visclaims.autounclaim")) {
+            p.sendMessage("§cNo permission.");
+            return true;
+        }
+        boolean now = plugin.getMoveListener().toggleAutounclaim(p.getUniqueId());
+        p.sendMessage(now ? "§cAutounclaim enabled. You will unclaim owned chunks as you move." : "§aAutounclaim disabled.");
         return true;
     }
 

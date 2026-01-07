@@ -16,6 +16,7 @@ public class MoveListener implements Listener {
     private final TownManager townManager;
     private final Map<UUID, Boolean> autoclaim = new HashMap<>();
     private final Map<UUID, Boolean> autohistory = new HashMap<>();
+    private final Map<UUID, Boolean> autounclaim = new HashMap<>();
     private final Map<UUID, String> lastTownAt = new HashMap<>();
     private final Map<UUID, UUID> lastTownOwner = new HashMap<>();
     private final Map<UUID, String> lastChunkId = new HashMap<>();
@@ -35,6 +36,12 @@ public class MoveListener implements Listener {
     public boolean toggleAutohistory(UUID uuid) {
         boolean now = !autohistory.getOrDefault(uuid, false);
         autohistory.put(uuid, now);
+        return now;
+    }
+
+    public boolean toggleAutounclaim(UUID uuid) {
+        boolean now = !autounclaim.getOrDefault(uuid, false);
+        autounclaim.put(uuid, now);
         return now;
     }
 
@@ -73,6 +80,7 @@ public class MoveListener implements Listener {
         UUID id = e.getPlayer().getUniqueId();
         if (autoclaim.remove(id) != null) e.getPlayer().sendMessage("§cAutoclaim disabled (teleport).");
         if (autohistory.remove(id) != null) e.getPlayer().sendMessage("§cAutohistory disabled (teleport).");
+        if (autounclaim.remove(id) != null) e.getPlayer().sendMessage("§cAutounclaim disabled (teleport).");
 
         handleChunkChange(e.getPlayer(), to);
     }
@@ -82,6 +90,7 @@ public class MoveListener implements Listener {
         UUID id = e.getPlayer().getUniqueId();
         autoclaim.remove(id);
         autohistory.remove(id);
+        autounclaim.remove(id);
         lastTownAt.remove(id);
         lastTownOwner.remove(id);
         lastChunkId.remove(id);
@@ -103,6 +112,7 @@ public class MoveListener implements Listener {
         updateTownPresence(p, atTown);
         handleAutoclaim(p, to, atTown);
         handleAutohistory(p, pos);
+        handleAutounclaim(p, pos);
     }
 
     private void updateTownPresence(Player p, Optional<Town> atTown) {
@@ -144,10 +154,14 @@ public class MoveListener implements Listener {
         int max = townManager.computeMaxClaims(t.getOwner());
         boolean bypass = p.hasPermission("visclaims.admin");
         ChunkPos pos = ChunkPos.of(to);
-        if (townManager.exceedsOutpostLimit(t, pos, bypass)) {
-            int allowed = townManager.computeAllowedOutposts(t.getOwner());
-            int groups = townManager.countClaimIslands(t);
-            p.sendMessage("§cCannot auto-claim: outpost limit reached (" + groups + "/" + allowed + " clusters). Expand an existing claim.");
+        int allowedOutposts = townManager.computeAllowedOutposts(t.getOwner());
+        int currentOutposts = townManager.countClaimIslands(t);
+        if (townManager.isOverOutpostCap(t, bypass)) {
+            p.sendMessage("§cCannot auto-claim: you have §e" + currentOutposts + "§c outposts but are allowed §e" + allowedOutposts + "§c. Unclaim to continue.");
+            return;
+        }
+        if (townManager.wouldExceedOutpostCap(t, pos, bypass)) {
+            p.sendMessage("§cCannot auto-claim: outpost cap reached (" + currentOutposts + "/" + allowedOutposts + "). Expand an existing cluster or unclaim to free a slot.");
             return;
         }
         boolean ok = townManager.claimChunk(t, to, bypass, p.getUniqueId());
@@ -176,6 +190,18 @@ public class MoveListener implements Listener {
             sb.append(e.getAction()).append(" ").append(townLabel).append(" (").append(formatAgo(e.getTimestamp())).append(")");
         }
         p.sendMessage(sb.toString());
+    }
+
+    private void handleAutounclaim(Player p, ChunkPos pos) {
+        if (!autounclaim.getOrDefault(p.getUniqueId(), false)) return;
+        Optional<Town> townOpt = townManager.getTownOf(p.getUniqueId());
+        if (townOpt.isEmpty()) return;
+        Town t = townOpt.get();
+        if (!t.ownsChunk(pos)) return;
+        boolean ok = townManager.unclaimChunk(t, pos);
+        if (ok) {
+            p.sendMessage("§cAuto-unclaimed chunk (" + pos.getX() + ", " + pos.getZ() + ")");
+        }
     }
 
     private void notifyTownEntry(Player entrant, Town town) {

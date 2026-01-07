@@ -162,7 +162,8 @@ public class TownManager {
         if (t == null) return false;
         if (!bypass && t.claimCount() >= computeMaxClaims(t.getOwner())) return false;
         ChunkPos pos = ChunkPos.of(chunk);
-        if (exceedsOutpostLimit(t, pos, bypass)) return false;
+        if (isOverOutpostCap(t, bypass)) return false;
+        if (wouldExceedOutpostCap(t, pos, bypass)) return false;
         if (townsByChunkId.containsKey(pos.id())) return false;
         boolean ok = t.addClaim(pos);
         if (!ok) return false;
@@ -341,10 +342,13 @@ public class TownManager {
         int baseMax = plugin.getConfig().getInt("max-claims-per-player", 64);
         int bonus = (t != null) ? t.getBonusChunks() : 0;
         int theoretical = Math.max(1, computeTheoreticalClaims(owner, baseMax, bonus));
-        // Base allowance is 1% of theoretical max claims, with an exponential dampener so large totals get proportionally fewer islands
-        double base = theoretical * 0.01d;
-        double dampener = Math.pow(0.9d, theoretical / 100.0d);
-        return Math.max(1, (int) Math.round(base * dampener));
+        // Diminishing growth: start at 3 outposts around 512 claims and asymptotically approach 9 outposts.
+        double ratio = Math.max(1.0d, theoretical / 512.0d);
+        double baseOutposts = 3.0d;
+        double maxOutposts = 9.0d;
+        double k = 0.6d; // growth rate
+        double allowed = baseOutposts + (maxOutposts - baseOutposts) * (1.0d - Math.exp(-k * (ratio - 1.0d)));
+        return Math.max(1, (int) Math.round(allowed));
     }
 
     public boolean isAdjacentToOwnClaim(Town town, ChunkPos pos) {
@@ -390,6 +394,22 @@ public class TownManager {
 
     public int countClaimIslands(UUID owner) {
         return getTownByOwner(owner).map(this::countClaimIslands).orElse(0);
+    }
+
+    public boolean isOverOutpostCap(Town town, boolean bypass) {
+        if (bypass || town == null) return false;
+        int allowed = computeAllowedOutposts(town.getOwner());
+        int current = countClaimIslands(town);
+        return current > allowed;
+    }
+
+    public boolean wouldExceedOutpostCap(Town town, ChunkPos pos, boolean bypass) {
+        if (bypass || town == null) return false;
+        int allowed = computeAllowedOutposts(town.getOwner());
+        int current = countClaimIslands(town);
+        if (current > allowed) return true;
+        boolean adjacent = isAdjacentToOwnClaim(town, pos);
+        return !adjacent && current >= allowed;
     }
 
     public boolean exceedsOutpostLimit(Town town, ChunkPos pos, boolean bypass) {

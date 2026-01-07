@@ -35,6 +35,7 @@ public class VisualClaims extends JavaPlugin {
         getCommand("claimchunk").setExecutor(handler);
         getCommand("unclaim").setExecutor(handler);       // ✅ Added
         getCommand("autoclaim").setExecutor(handler);
+        getCommand("autounclaim").setExecutor(handler);
         getCommand("settownname").setExecutor(handler);
         getCommand("settowncolor").setExecutor(handler);
         getCommand("settowndesc").setExecutor(handler);

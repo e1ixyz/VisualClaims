@@ -73,6 +73,7 @@ line-weight: 2
 | `/claimchunk` | Claim the chunk you are standing in. | `visclaims.claim` | true |
 | `/unclaim` | Unclaim the current chunk (admins can force-unclaim). | `visclaims.unclaim` | true |
 | `/autoclaim` | Toggle automatic claiming while you walk. | `visclaims.autoclaim` | true |
+| `/autounclaim` | Toggle automatic unclaiming of owned chunks as you walk. | `visclaims.autounclaim` | true |
 | `/autohistory` | Toggle automatic chunk history popups while you walk. | `visclaims.autohistory` | true |
 | `/leaderboard [toggle]` | Show top towns by claims/kills in chat or toggle the sidebar leaderboard. | `visclaims.leaderboard` | true |
 | `/claimalerts` | Toggle the chat messages when you enter or leave claimed chunks. | `visclaims.claimalerts` | true |
@@ -128,6 +129,7 @@ Playtime scaling reads the built-in `Statistic.PLAY_ONE_MINUTE` (same counter us
 - Use `/claimalerts` to mute your personal enter/leave messages. Staff (or anyone with `visclaims.silentvisit`) can toggle `/silentvisit` to avoid alerting other towns when passing through their land.
 - `/leaderboard` (alias `/lb`) shows the top 3 towns by kills, then claims, plus your own kills/deaths/claims. Add `toggle` to enable a persistent sidebar.
 - Outposts (non-contiguous claim clusters) are capped at roughly 1% of your theoretical claim limit with an exponential reduction as your cap grows. Your first claim is exempt, expansions of existing clusters are fine, and admins (`visclaims.admin`) bypass the cap. Existing outposts stay; the cap applies to creating new isolated clusters.
+- If you exceed your outpost cap, no new claims are allowed (including expansions) until you unclaim enough chunks to get back to or under your cap. `/claimlimit` shows your current/allowed outposts. `/autounclaim` can help shed land quickly.
 
 ## Gallery
 

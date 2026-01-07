@@ -26,6 +26,10 @@ commands:
     description: Toggle autoclaim for chunks
     usage: /autoclaim
     permission: visclaims.autoclaim
+  autounclaim:
+    description: Toggle auto-unclaiming your owned chunks as you walk
+    usage: /autounclaim
+    permission: visclaims.autounclaim
   settownname:
     description: Rename your town
     usage: /settownname <name>
@@ -143,6 +147,9 @@ permissions:
     default: true
   visclaims.autoclaim:
     description: Allows toggling autoclaim
+    default: true
+  visclaims.autounclaim:
+    description: Allows toggling auto-unclaim
     default: true
   visclaims.setname:
     description: Allows renaming your town
