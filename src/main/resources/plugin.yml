@@ -72,7 +72,7 @@ commands:
     usage: /claimreload
     permission: visclaims.admin
   trimoutposts:
-    description: Admin: remove smallest outpost clusters for a player
+    description: "Admin: remove smallest outpost clusters for a player"
     usage: /trimoutposts <player> [count]
     permission: visclaims.admin
   claimlimit:
