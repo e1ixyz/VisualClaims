@@ -782,11 +782,15 @@ public class CommandHandler implements CommandExecutor {
             return true;
         }
         if (alreadyWar) {
-            p.sendMessage("§aYou are no longer at war with §e" + towns.coloredTownName(other));
+            String msg = "§aWar ended with §e" + towns.coloredTownName(other);
+            p.sendMessage(msg);
             towns.messageTown(other, "§e" + towns.coloredTownName(mine) + " §7ended the war.");
+            towns.broadcastWarUpdate(msg);
         } else {
-            p.sendMessage("§cYou declared war on §e" + towns.coloredTownName(other));
+            String msg = "§cWar declared on §e" + towns.coloredTownName(other);
+            p.sendMessage(msg);
             towns.messageTown(other, "§c" + towns.coloredTownName(mine) + " §7declared war on you!");
+            towns.broadcastWarUpdate(msg);
         }
         return true;
     }

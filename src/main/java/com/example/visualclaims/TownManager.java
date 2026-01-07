@@ -786,50 +786,9 @@ public class TownManager {
         obj.setDisplaySlot(DisplaySlot.SIDEBAR);
 
         int score = 15;
-        obj.getScore(ChatColor.AQUA + "Top Kills").setScore(score--);
-        if (killsTop.isEmpty()) {
-            obj.getScore(ChatColor.GRAY + "None").setScore(score--);
-        } else {
-            int idx = 1;
-            for (Town t : killsTop) {
-                if (score < 1) break;
-                String line = ChatColor.WHITE + "" + idx + ". " + coloredTownName(t) + ChatColor.GRAY + " (" + t.getKills() + ")" + ChatColor.DARK_GRAY + " k" + idx;
-                obj.getScore(line).setScore(score--);
-                idx++;
-            }
-        }
+        boolean hasWars = wars != null && !wars.isEmpty();
 
-        obj.getScore(ChatColor.YELLOW + "Top Claims").setScore(score--);
-        if (claimsTop.isEmpty()) {
-            obj.getScore(ChatColor.GRAY + "None").setScore(score--);
-        } else {
-            int idx = 1;
-            for (Town t : claimsTop) {
-                if (score < 1) break;
-                String line = ChatColor.WHITE + "" + idx + ". " + coloredTownName(t) + ChatColor.GRAY + " (" + t.claimCount() + ")" + ChatColor.DARK_GRAY + " c" + idx;
-                obj.getScore(line).setScore(score--);
-                idx++;
-            }
-        }
-
-        // Player personal stats
-        PlayerStats stats = getPlayerStats(viewer);
-        int claimCount = getTownOf(viewer)
-                .map(Town::claimCount)
-                .orElseGet(() -> {
-                    for (Town t : townsByOwner.values()) {
-                        if (t.isMember(viewer)) return t.claimCount();
-                    }
-                    return stats.getClaims();
-                });
-        obj.getScore(ChatColor.GRAY + "----------------" + ChatColor.DARK_GRAY + " sep").setScore(score--);
-        obj.getScore(ChatColor.GREEN + "You").setScore(score--);
-        obj.getScore(playerStatLine("Kills", stats.getKills(), "yk")).setScore(score--);
-        obj.getScore(playerStatLine("Deaths", stats.getDeaths(), "yd")).setScore(score--);
-        obj.getScore(playerStatLine("Claims", claimCount, "yc")).setScore(score--);
-
-        if (wars != null && !wars.isEmpty()) {
-            obj.getScore(ChatColor.GRAY + "----------------" + ChatColor.DARK_GRAY + " war").setScore(score--);
+        if (hasWars) {
             obj.getScore(ChatColor.RED + "Active Wars").setScore(score--);
             int idx = 1;
             for (String line : wars) {
@@ -846,8 +805,49 @@ public class TownManager {
                     idx++;
                 }
             }
+        } else {
+            obj.getScore(ChatColor.AQUA + "Top Kills").setScore(score--);
+            if (killsTop.isEmpty()) {
+                obj.getScore(ChatColor.GRAY + "None").setScore(score--);
+            } else {
+                int idx = 1;
+                for (Town t : killsTop) {
+                    if (score < 1) break;
+                    String line = ChatColor.WHITE + "" + idx + ". " + coloredTownName(t) + ChatColor.GRAY + " (" + t.getKills() + ")" + ChatColor.DARK_GRAY + " k" + idx;
+                    obj.getScore(line).setScore(score--);
+                    idx++;
+                }
+            }
+
+            obj.getScore(ChatColor.YELLOW + "Top Claims").setScore(score--);
+            if (claimsTop.isEmpty()) {
+                obj.getScore(ChatColor.GRAY + "None").setScore(score--);
+            } else {
+                int idx = 1;
+                for (Town t : claimsTop) {
+                    if (score < 1) break;
+                    String line = ChatColor.WHITE + "" + idx + ". " + coloredTownName(t) + ChatColor.GRAY + " (" + t.claimCount() + ")" + ChatColor.DARK_GRAY + " c" + idx;
+                    obj.getScore(line).setScore(score--);
+                    idx++;
+                }
+            }
+
+            // Player personal stats
+            PlayerStats stats = getPlayerStats(viewer);
+            int claimCount = getTownOf(viewer)
+                    .map(Town::claimCount)
+                    .orElseGet(() -> {
+                        for (Town t : townsByOwner.values()) {
+                            if (t.isMember(viewer)) return t.claimCount();
+                        }
+                        return stats.getClaims();
+                    });
+            obj.getScore(ChatColor.GRAY + "----------------" + ChatColor.DARK_GRAY + " sep").setScore(score--);
+            obj.getScore(ChatColor.GREEN + "You").setScore(score--);
+            obj.getScore(playerStatLine("Kills", stats.getKills(), "yk")).setScore(score--);
+            obj.getScore(playerStatLine("Deaths", stats.getDeaths(), "yd")).setScore(score--);
+            obj.getScore(playerStatLine("Claims", claimCount, "yc")).setScore(score--);
         }
-        obj.getScore(ChatColor.GRAY + "Hide: /lb toggle" + ChatColor.DARK_GRAY + " tip").setScore(score--);
 
         return board;
     }
@@ -950,3 +950,9 @@ public class TownManager {
         public int getClaims() { return claims; }
     }
 }
+    public void broadcastWarUpdate(String message) {
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            p.sendMessage(message);
+        }
+        refreshLeaderboardScoreboard();
+    }
