@@ -316,6 +316,8 @@ public class CommandHandler implements CommandExecutor {
         int theoretical = baseMax + playtimeAllowance + bonus;
         int limit = Math.max(theoretical, claimed);
         int overflow = Math.max(0, claimed - theoretical);
+        int allowedOutposts = towns.computeAllowedOutposts(t.getOwner());
+        int currentOutposts = towns.countClaimIslands(t);
 
         p.sendMessage("§e--- Claim Limit for " + targetName + " ---");
         p.sendMessage("§7Base cap: §f" + baseMax);
@@ -326,6 +328,7 @@ public class CommandHandler implements CommandExecutor {
         p.sendMessage("§7Allowed total: §f" + theoretical + (overflow > 0 ? " §8(overflow by " + overflow + " grandfathered)" : ""));
         p.sendMessage("§7Claims held: §f" + claimed);
         p.sendMessage("§7Effective limit (never lowers below claims): §f" + limit);
+        p.sendMessage("§7Outposts (separate clusters): §f" + currentOutposts + " §7/ §f" + allowedOutposts + " §8(new isolated clusters blocked if over the cap)");
         return true;
     }
 

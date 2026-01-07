@@ -388,6 +388,10 @@ public class TownManager {
         return islands;
     }
 
+    public int countClaimIslands(UUID owner) {
+        return getTownByOwner(owner).map(this::countClaimIslands).orElse(0);
+    }
+
     public boolean exceedsOutpostLimit(Town town, ChunkPos pos, boolean bypass) {
         if (bypass || town == null) return false;
         if (town.claimCount() == 0) return false; // first claim always allowed
