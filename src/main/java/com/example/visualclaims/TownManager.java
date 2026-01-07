@@ -865,7 +865,7 @@ public class TownManager {
         for (Player p : Bukkit.getOnlinePlayers()) {
             applyScoreboard(p);
             if (enabled) {
-                p.playSound(p.getLocation(), org.bukkit.Sound.ENTITY_ENDER_DRAGON_FIREBALL_EXPLODE, 1.0f, 1.0f);
+                p.playSound(p.getLocation(), org.bukkit.Sound.ENTITY_DRAGON_FIREBALL_EXPLODE, 1.0f, 1.0f);
             }
         }
     }
