@@ -65,8 +65,6 @@ public class CommandHandler implements CommandExecutor {
             case "towninfo": return townInfo(p, args);
             case "war": return warCommand(p, args);
             case "alliance": return allianceCommand(p, args);
-            case "warmode": return warModeAdmin(p, args);
-            case "warscoreboard": return toggleWarScoreboard(p);
             case "claimadmin": return claimAdminHelp(p, args);
             case "admindeletetown": return adminDeleteTown(p, args);
             default: return false;
@@ -389,13 +387,11 @@ public class CommandHandler implements CommandExecutor {
                 p.sendMessage("§cNo permission.");
                 return true;
             }
-            p.sendMessage("§c--- Admin Claim Commands ---");
-            p.sendMessage("§f/claimreload §7- Reload VisualClaims config and data");
-            p.sendMessage("§f/adjustclaims <player> <add|remove> <amount> §7- Modify bonus claims");
-            p.sendMessage("§f/warmode <on|off> §7- Toggle global war mode & scoreboards");
-            p.sendMessage("§f/warscoreboard §7- Toggle your war scoreboard view");
-            p.sendMessage("§f/admindeletetown <town> §7- Delete a town by name/owner");
-            p.sendMessage("§f/unclaim §7(with visclaims.admin) - Force unclaim any chunk");
+        p.sendMessage("§c--- Admin Claim Commands ---");
+        p.sendMessage("§f/claimreload §7- Reload VisualClaims config and data");
+        p.sendMessage("§f/adjustclaims <player> <add|remove> <amount> §7- Modify bonus claims");
+        p.sendMessage("§f/admindeletetown <town> §7- Delete a town by name/owner");
+        p.sendMessage("§f/unclaim §7(with visclaims.admin) - Force unclaim any chunk");
             p.sendMessage("§f/trimoutposts <player> [count] §7- Remove the smallest outpost clusters for a player");
             return true;
         }
@@ -759,17 +755,9 @@ public class CommandHandler implements CommandExecutor {
     }
 
     private boolean warCommand(Player p, String[] args) {
-        if (!p.hasPermission("visclaims.war")) {
-            p.sendMessage("§cNo permission.");
-            return true;
-        }
-        if (!towns.isWarModeEnabled()) {
-            p.sendMessage("§cWar mode is currently disabled by admins.");
-            return true;
-        }
-        Optional<Town> myTownOpt = towns.getTownByOwner(p.getUniqueId());
+        Optional<Town> myTownOpt = towns.getTownOf(p.getUniqueId());
         if (myTownOpt.isEmpty()) {
-            p.sendMessage("§cOnly town owners can manage wars.");
+            p.sendMessage("§cYou need to be in a town to manage wars.");
             return true;
         }
         if (args.length != 1) {
@@ -804,17 +792,9 @@ public class CommandHandler implements CommandExecutor {
     }
 
     private boolean allianceCommand(Player p, String[] args) {
-        if (!p.hasPermission("visclaims.alliance")) {
-            p.sendMessage("§cNo permission.");
-            return true;
-        }
-        if (!towns.isWarModeEnabled()) {
-            p.sendMessage("§cAlliances and wars are disabled until war mode is enabled by an admin.");
-            return true;
-        }
-        Optional<Town> myTownOpt = towns.getTownByOwner(p.getUniqueId());
+        Optional<Town> myTownOpt = towns.getTownOf(p.getUniqueId());
         if (myTownOpt.isEmpty()) {
-            p.sendMessage("§cOnly town owners can manage alliances.");
+            p.sendMessage("§cYou need to be in a town to manage alliances.");
             return true;
         }
         if (args.length < 1) {
@@ -883,32 +863,6 @@ public class CommandHandler implements CommandExecutor {
         return true;
     }
 
-    private boolean warModeAdmin(Player p, String[] args) {
-        if (!p.hasPermission("visclaims.warmode")) {
-            p.sendMessage("§cNo permission.");
-            return true;
-        }
-        if (args.length != 1 || !(args[0].equalsIgnoreCase("on") || args[0].equalsIgnoreCase("off"))) {
-            p.sendMessage("Usage: /warmode <on|off>");
-            return true;
-        }
-        boolean enable = args[0].equalsIgnoreCase("on");
-        towns.setWarModeEnabled(enable);
-        p.sendMessage(enable ? "§cWar mode enabled. War commands and scoreboards are now active." : "§aWar mode disabled. Scoreboards reset.");
-        return true;
-    }
-
-    private boolean toggleWarScoreboard(Player p) {
-        if (!p.hasPermission("visclaims.warscoreboard")) {
-            p.sendMessage("§cNo permission.");
-            return true;
-        }
-        boolean enabled = towns.toggleScoreboard(p.getUniqueId());
-        if (towns.isWarModeEnabled() && enabled) towns.applyScoreboard(p);
-        p.sendMessage(enabled ? "§aWar scoreboard enabled." : "§cWar scoreboard disabled.");
-        return true;
-    }
-
     private boolean claimAdminHelp(Player p, String[] args) {
         if (!p.hasPermission("visclaims.adminhelp")) {
             p.sendMessage("§cNo permission.");
@@ -916,10 +870,9 @@ public class CommandHandler implements CommandExecutor {
         }
         p.sendMessage("§c--- Admin Claim Commands ---");
         p.sendMessage("§f/adjustclaims <player> <add|remove> <amount> §7- Modify bonus claims");
-        p.sendMessage("§f/warmode <on|off> §7- Toggle global war mode & scoreboards");
-        p.sendMessage("§f/warscoreboard §7- Toggle your war scoreboard view");
         p.sendMessage("§f/admindeletetown <town> §7- Delete a town by name/owner");
         p.sendMessage("§f/unclaim (with visclaims.admin) §7- Force unclaim any chunk");
+        p.sendMessage("§f/trimoutposts <player> [count] §7- Remove the smallest outpost clusters for a player");
         return true;
     }
 

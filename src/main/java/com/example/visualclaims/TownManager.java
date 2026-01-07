@@ -45,8 +45,6 @@ public class TownManager {
     private final Map<UUID, AllianceInvite> pendingAllianceInvites = new HashMap<>();
     // chunkId -> history entries (newest first)
     private final Map<String, List<ChunkHistoryEntry>> chunkHistory = new HashMap<>();
-    // players who disabled the war scoreboard
-    private final Set<UUID> scoreboardDisabled = new HashSet<>();
     // players who disabled the leaderboard scoreboard
     private final Set<UUID> leaderboardDisabled = new HashSet<>();
     // players who enabled silent visiting
@@ -54,10 +52,6 @@ public class TownManager {
     // per-player stats
     private final Map<String, PlayerStats> playerStats = new HashMap<>();
 
-    private boolean warModeEnabled = false;
-
-    private Scoreboard warBoard;
-    private Objective warObjective;
     private final Map<UUID, Scoreboard> leaderboardBoards = new HashMap<>();
 
     public TownManager(VisualClaims plugin, DynmapHook dynmap) {
@@ -96,7 +90,6 @@ public class TownManager {
         townsByOwner.put(owner, t);
         indexTown(t);
         saveTown(t);
-        refreshWarScoreboard();
         refreshLeaderboardScoreboard();
         return true;
     }
@@ -120,7 +113,6 @@ public class TownManager {
         pendingAllianceInvites.entrySet().removeIf(e -> e.getValue().getFromOwner().equals(owner) || e.getValue().getToOwner().equals(owner));
         File f = new File(townsDir, owner.toString() + ".json");
         if (f.exists()) f.delete();
-        refreshWarScoreboard();
         refreshLeaderboardScoreboard();
         return true;
     }
@@ -149,7 +141,6 @@ public class TownManager {
 
         File f = new File(townsDir, owner.toString() + ".json");
         if (f.exists()) f.delete();
-        refreshWarScoreboard();
         refreshLeaderboardScoreboard();
         return true;
     }
@@ -280,7 +271,7 @@ public class TownManager {
         saveTown(a);
         saveTown(b);
         pendingAllianceInvites.remove(owner);
-        refreshWarScoreboard();
+        refreshLeaderboardScoreboard();
         return true;
     }
 
@@ -292,7 +283,7 @@ public class TownManager {
         if (changed) {
             saveTown(a);
             saveTown(b);
-            refreshWarScoreboard();
+            refreshLeaderboardScoreboard();
         }
         return changed;
     }
@@ -311,7 +302,7 @@ public class TownManager {
         }
         saveTown(a);
         saveTown(b);
-        refreshWarScoreboard();
+        refreshLeaderboardScoreboard();
         return true;
     }
 
@@ -620,7 +611,6 @@ public class TownManager {
         loadStats();
         loadSilentVisitors();
         bootstrapHistoryForExistingClaims();
-        refreshWarScoreboard();
         refreshLeaderboardScoreboard();
     }
 
@@ -743,62 +733,6 @@ public class TownManager {
         return new ArrayList<>(lines);
     }
 
-    public void refreshWarScoreboard() {
-        ScoreboardManager mgr = Bukkit.getScoreboardManager();
-        if (mgr == null) return;
-
-        if (!warModeEnabled) {
-            warBoard = null;
-            warObjective = null;
-            for (Player p : Bukkit.getOnlinePlayers()) applyScoreboard(p);
-            return;
-        }
-
-        List<String> wars = buildWarLines();
-        List<String> allies = buildAllianceLines();
-
-        if (wars.isEmpty()) {
-            warBoard = null;
-            warObjective = null;
-            for (Player p : Bukkit.getOnlinePlayers()) applyScoreboard(p);
-            return;
-        }
-
-        Scoreboard board = mgr.getNewScoreboard();
-        Objective obj = board.registerNewObjective("vc_war", "dummy", ChatColor.RED + "" + ChatColor.BOLD + "War Mode");
-        obj.setDisplaySlot(DisplaySlot.SIDEBAR);
-
-        int score = 15;
-        obj.getScore(ChatColor.GOLD + "Wars").setScore(score--);
-        int idx = 1;
-        if (wars.isEmpty()) {
-            obj.getScore(ChatColor.GRAY + "None").setScore(score--);
-        } else {
-            for (String line : wars) {
-                if (score < 1) break;
-                obj.getScore(ChatColor.WHITE + "" + idx + ". " + line).setScore(score--);
-                idx++;
-            }
-        }
-        obj.getScore(ChatColor.AQUA + "Alliances").setScore(score--);
-        idx = 1;
-        if (allies.isEmpty()) {
-            obj.getScore(ChatColor.GRAY + "None ").setScore(score--);
-        } else {
-            for (String line : allies) {
-                if (score < 1) break;
-                obj.getScore(ChatColor.WHITE + "" + idx + ". " + line).setScore(score--);
-                idx++;
-            }
-        }
-
-        warBoard = board;
-        warObjective = obj;
-        for (Player p : Bukkit.getOnlinePlayers()) {
-            applyScoreboard(p);
-        }
-    }
-
     public void applyScoreboard(Player p) {
         ScoreboardManager mgr = Bukkit.getScoreboardManager();
         UUID id = p.getUniqueId();
@@ -807,9 +741,7 @@ public class TownManager {
             Scoreboard lb = leaderboardBoards.get(id);
             if (lb != null) { p.setScoreboard(lb); return; }
         }
-        if (warBoard != null && warModeEnabled && !scoreboardDisabled.contains(id)) {
-            p.setScoreboard(warBoard);
-        } else if (mgr != null) {
+        if (mgr != null) {
             p.setScoreboard(mgr.getMainScoreboard());
         }
     }
@@ -834,19 +766,21 @@ public class TownManager {
 
         List<Town> killsTop = topByKills(3);
         List<Town> claimsTop = topByClaims(3);
+        List<String> wars = buildWarLines();
+        List<String> allies = wars.isEmpty() ? Collections.emptyList() : buildAllianceLines();
 
         leaderboardBoards.entrySet().removeIf(e -> leaderboardDisabled.contains(e.getKey()));
 
         for (Player online : Bukkit.getOnlinePlayers()) {
             UUID viewer = online.getUniqueId();
             if (leaderboardDisabled.contains(viewer)) continue;
-            Scoreboard board = buildLeaderboardBoard(mgr, viewer, killsTop, claimsTop);
+            Scoreboard board = buildLeaderboardBoard(mgr, viewer, killsTop, claimsTop, wars, allies);
             leaderboardBoards.put(viewer, board);
             online.setScoreboard(board);
         }
     }
 
-    private Scoreboard buildLeaderboardBoard(ScoreboardManager mgr, UUID viewer, List<Town> killsTop, List<Town> claimsTop) {
+    private Scoreboard buildLeaderboardBoard(ScoreboardManager mgr, UUID viewer, List<Town> killsTop, List<Town> claimsTop, List<String> wars, List<String> allies) {
         Scoreboard board = mgr.getNewScoreboard();
         Objective obj = board.registerNewObjective("vc_leaders", "dummy", ChatColor.GOLD + "" + ChatColor.BOLD + "Leaderboard");
         obj.setDisplaySlot(DisplaySlot.SIDEBAR);
@@ -893,6 +827,26 @@ public class TownManager {
         obj.getScore(playerStatLine("Kills", stats.getKills(), "yk")).setScore(score--);
         obj.getScore(playerStatLine("Deaths", stats.getDeaths(), "yd")).setScore(score--);
         obj.getScore(playerStatLine("Claims", claimCount, "yc")).setScore(score--);
+
+        if (wars != null && !wars.isEmpty()) {
+            obj.getScore(ChatColor.GRAY + "----------------" + ChatColor.DARK_GRAY + " war").setScore(score--);
+            obj.getScore(ChatColor.RED + "Active Wars").setScore(score--);
+            int idx = 1;
+            for (String line : wars) {
+                if (score < 1) break;
+                obj.getScore(ChatColor.WHITE + "" + idx + ". " + line + ChatColor.DARK_GRAY + " w" + idx).setScore(score--);
+                idx++;
+            }
+            if (allies != null && !allies.isEmpty()) {
+                obj.getScore(ChatColor.AQUA + "Alliances").setScore(score--);
+                idx = 1;
+                for (String line : allies) {
+                    if (score < 1) break;
+                    obj.getScore(ChatColor.WHITE + "" + idx + ". " + line + ChatColor.DARK_GRAY + " a" + idx).setScore(score--);
+                    idx++;
+                }
+            }
+        }
         obj.getScore(ChatColor.GRAY + "Hide: /lb toggle" + ChatColor.DARK_GRAY + " tip").setScore(score--);
 
         return board;
@@ -936,38 +890,6 @@ public class TownManager {
             }
         }
         return names;
-    }
-
-    public void setWarModeEnabled(boolean enabled) {
-        this.warModeEnabled = enabled;
-        if (enabled) {
-            scoreboardDisabled.clear();
-        }
-        refreshWarScoreboard();
-        for (Player p : Bukkit.getOnlinePlayers()) {
-            applyScoreboard(p);
-            if (enabled) {
-                p.playSound(p.getLocation(), org.bukkit.Sound.ENTITY_DRAGON_FIREBALL_EXPLODE, 1.0f, 1.0f);
-            }
-        }
-    }
-
-    public boolean isWarModeEnabled() {
-        return warModeEnabled;
-    }
-
-    public boolean toggleScoreboard(UUID player) {
-        if (scoreboardDisabled.contains(player)) {
-            scoreboardDisabled.remove(player);
-            Player p = Bukkit.getPlayer(player);
-            if (p != null) applyScoreboard(p);
-            return true;
-        } else {
-            scoreboardDisabled.add(player);
-            Player p = Bukkit.getPlayer(player);
-            if (p != null) applyScoreboard(p);
-            return false;
-        }
     }
 
     public net.md_5.bungee.api.ChatColor toChatColor(VanillaColor c) {

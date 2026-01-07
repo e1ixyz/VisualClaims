@@ -79,7 +79,6 @@ line-weight: 2
 | `/claimalerts` | Toggle the chat messages when you enter or leave claimed chunks. | `visclaims.claimalerts` | true |
 | `/silentvisit` | Toggle silently entering other players' towns (no alerts sent to them). | `visclaims.silentvisit` | op |
 | `/claimreload` | Admin: reload VisualClaims config and data. | `visclaims.admin` | op |
-| `/trimoutposts <player> [count]` | Admin: remove the smallest outpost clusters for a player. | `visclaims.admin` | op |
 | `/settownname <name>` | Rename your town. | `visclaims.setname` | true |
 | `/settowncolor <color>` | Change the town colour (see list below). | `visclaims.setcolor` | true |
 | `/settowndesc <text>` | Set your town description. | `visclaims.setdesc` | true |
@@ -92,14 +91,21 @@ line-weight: 2
 | `/removemember <player>` | Remove a member from your town (owner only). | `visclaims.kick` | true |
 | `/towns` | Public list of all towns, descriptions, and members. | `visclaims.towns` | true |
 | `/towninfo <town>` | Public details for a specific town. | `visclaims.towninfo` | true |
-| `/war <town>` | Declare/resolve war with another town (owner only). | `visclaims.war` | true |
-| `/alliance <town>|accept <town>|remove <town>` | Manage alliances (owner only). | `visclaims.alliance` | true |
+| `/war <town>` | Declare/resolve war with another town. | `visclaims.war` | true |
+| `/alliance <town>|accept <town>|remove <town>` | Manage alliances. | `visclaims.alliance` | true |
 | `/claim` | Show the quick reference help. | `visclaims.help` | true |
 | `/claim admin` | Show admin-only claim commands. | `visclaims.adminhelp` | op |
-| `/warscoreboard` | Toggle your war/alliance sidebar scoreboard. | `visclaims.warscoreboard` | true |
-| `/warmode <on|off>` | Admin: enable/disable global war mode & scoreboards. | `visclaims.warmode` | op |
 | `/claimadmin` | Admin-only help list. | `visclaims.adminhelp` | op |
 | `/adjustclaims <player> <add|remove> <amount>` | Admin: add or subtract bonus claim slots for a player. | `visclaims.admin` | op |
+
+### Admin Commands
+| Command | Description | Permission | Default |
+| --- | --- | --- | --- |
+| `/claimreload` | Reload VisualClaims config and data. | `visclaims.admin` | op |
+| `/adjustclaims <player> <add|remove> <amount>` | Add or subtract bonus claim slots for a player. | `visclaims.admin` | op |
+| `/trimoutposts <player> [count]` | Remove the smallest outpost clusters for a player. | `visclaims.admin` | op |
+| `/admindeletetown <town>` | Delete a town by name/owner. | `visclaims.admindelete` | op |
+| `/claimadmin` | Admin-only help list. | `visclaims.adminhelp` | op |
 
 `visclaims.admin` grants moderators the ability to bypass claim limits and force-unclaim land owned by other towns.
 
@@ -107,7 +113,7 @@ Playtime scaling reads the built-in `Statistic.PLAY_ONE_MINUTE` (same counter us
 
 ### Notes
 - `/towns` lists only town names with a clickable `[Info]` button to open details, using each town's configured colour.
-- War/alliance commands are only available while admins have enabled `/warmode`. Enabling war mode turns on the scoreboard for everyone by default; players can use `/warscoreboard` to toggle their own view.
+- Wars and alliances are always available; active wars are shown at the bottom of the leaderboard sidebar, and alliances appear there too when wars exist.
 - Chunk history is bootstrapped on load so existing claims have a baseline entry.
 
 ### Supported Colours
