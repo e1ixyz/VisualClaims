@@ -59,6 +59,7 @@ public class VisualClaims extends JavaPlugin {
         getCommand("leaderboard").setExecutor(handler);
         getCommand("claimalerts").setExecutor(handler);
         getCommand("silentvisit").setExecutor(handler);
+        getCommand("claimreload").setExecutor(handler);
 
         // Move listener
         moveListener = new MoveListener(this, townManager);

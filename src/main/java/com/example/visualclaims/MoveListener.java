@@ -143,6 +143,13 @@ public class MoveListener implements Listener {
         Town t = townOpt.get();
         int max = townManager.computeMaxClaims(t.getOwner());
         boolean bypass = p.hasPermission("visclaims.admin");
+        ChunkPos pos = ChunkPos.of(to);
+        if (townManager.exceedsOutpostLimit(t, pos, bypass)) {
+            int allowed = townManager.computeAllowedOutposts(t.getOwner());
+            int groups = townManager.countClaimIslands(t);
+            p.sendMessage("§cCannot auto-claim: outpost limit reached (" + groups + "/" + allowed + " clusters). Expand an existing claim.");
+            return;
+        }
         boolean ok = townManager.claimChunk(t, to, bypass, p.getUniqueId());
         if (ok) {
             p.sendMessage("§aAuto-claimed chunk (" + to.getX() + ", " + to.getZ() + ")");

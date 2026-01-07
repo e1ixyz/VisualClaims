@@ -63,6 +63,10 @@ commands:
     description: Toggle hiding entry alerts when visiting other towns
     usage: /silentvisit
     permission: visclaims.silentvisit
+  claimreload:
+    description: Reload VisualClaims config and data
+    usage: /claimreload
+    permission: visclaims.admin
   claimlimit:
     description: Show playtime-based claim limit
     usage: /claimlimit [player]
@@ -166,6 +170,9 @@ permissions:
     default: true
   visclaims.silentvisit:
     description: Allows entering other towns without sending alerts
+    default: op
+  visclaims.admin:
+    description: Bypass limits and manage towns for testing/admin purposes
     default: op
   visclaims.claimlimit:
     description: Allows using /claimlimit to view claim limits (admins can target others)

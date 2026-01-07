@@ -162,6 +162,7 @@ public class TownManager {
         if (t == null) return false;
         if (!bypass && t.claimCount() >= computeMaxClaims(t.getOwner())) return false;
         ChunkPos pos = ChunkPos.of(chunk);
+        if (exceedsOutpostLimit(t, pos, bypass)) return false;
         if (townsByChunkId.containsKey(pos.id())) return false;
         boolean ok = t.addClaim(pos);
         if (!ok) return false;
@@ -318,17 +319,82 @@ public class TownManager {
         Town t = townsByOwner.get(owner);
         int bonus = (t != null) ? t.getBonusChunks() : 0;
 
+        int theoretical = computeTheoreticalClaims(owner, baseMax, bonus);
+        int currentClaims = (t != null) ? t.claimCount() : 0;
+        return Math.max(theoretical, currentClaims);
+    }
+
+    private int computeTheoreticalClaims(UUID owner, int baseMax, int bonus) {
         if (!plugin.getConfig().getBoolean("use-playtime-scaling", false)) {
-            return Math.max(baseMax + bonus, t != null ? t.claimCount() : 0);
+            return baseMax + bonus;
         }
 
         int chunksPerHour = Math.max(1, plugin.getConfig().getInt("chunks-per-hour", 2));
         int hours = getPlaytimeHours(owner);
         int dynamic = hours * chunksPerHour;
 
-        int limit = baseMax + dynamic + bonus;
-        int currentClaims = (t != null) ? t.claimCount() : 0;
-        return Math.max(limit, currentClaims);
+        return baseMax + dynamic + bonus;
+    }
+
+    public int computeAllowedOutposts(UUID owner) {
+        Town t = townsByOwner.get(owner);
+        int baseMax = plugin.getConfig().getInt("max-claims-per-player", 64);
+        int bonus = (t != null) ? t.getBonusChunks() : 0;
+        int theoretical = Math.max(1, computeTheoreticalClaims(owner, baseMax, bonus));
+        // Base allowance is 1% of theoretical max claims, with an exponential dampener so large totals get proportionally fewer islands
+        double base = theoretical * 0.01d;
+        double dampener = Math.pow(0.9d, theoretical / 100.0d);
+        return Math.max(1, (int) Math.round(base * dampener));
+    }
+
+    public boolean isAdjacentToOwnClaim(Town town, ChunkPos pos) {
+        if (town == null || town.getClaims() == null || town.getClaims().isEmpty()) return false;
+        int x = pos.getX();
+        int z = pos.getZ();
+        String world = pos.getWorld();
+        int[][] dirs = { {1,0}, {-1,0}, {0,1}, {0,-1} };
+        for (int[] d : dirs) {
+            ChunkPos neighbor = new ChunkPos(world, x + d[0], z + d[1]);
+            if (town.ownsChunk(neighbor)) return true;
+        }
+        return false;
+    }
+
+    public int countClaimIslands(Town town) {
+        if (town == null || town.getClaims() == null || town.getClaims().isEmpty()) return 0;
+        Set<ChunkPos> claims = new HashSet<>(town.getClaims());
+        Set<ChunkPos> visited = new HashSet<>();
+        int islands = 0;
+        for (ChunkPos start : claims) {
+            if (visited.contains(start)) continue;
+            islands++;
+            Deque<ChunkPos> stack = new ArrayDeque<>();
+            stack.push(start);
+            while (!stack.isEmpty()) {
+                ChunkPos cur = stack.pop();
+                if (!visited.add(cur)) continue;
+                int x = cur.getX();
+                int z = cur.getZ();
+                String world = cur.getWorld();
+                int[][] dirs = { {1,0}, {-1,0}, {0,1}, {0,-1} };
+                for (int[] d : dirs) {
+                    ChunkPos neighbor = new ChunkPos(world, x + d[0], z + d[1]);
+                    if (claims.contains(neighbor) && !visited.contains(neighbor)) {
+                        stack.push(neighbor);
+                    }
+                }
+            }
+        }
+        return islands;
+    }
+
+    public boolean exceedsOutpostLimit(Town town, ChunkPos pos, boolean bypass) {
+        if (bypass || town == null) return false;
+        if (town.claimCount() == 0) return false; // first claim always allowed
+        if (isAdjacentToOwnClaim(town, pos)) return false; // expansion of existing cluster
+        int allowed = computeAllowedOutposts(town.getOwner());
+        int current = countClaimIslands(town);
+        return current >= allowed;
     }
 
     public int getPlaytimeHours(UUID owner) {
@@ -482,6 +548,11 @@ public class TownManager {
         bootstrapHistoryForExistingClaims();
         refreshWarScoreboard();
         refreshLeaderboardScoreboard();
+    }
+
+    public void reloadAll() {
+        plugin.reloadConfig();
+        loadAll();
     }
 
     private void loadHistory() {

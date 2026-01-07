@@ -54,6 +54,7 @@ public class CommandHandler implements CommandExecutor {
             case "silentvisit": return toggleSilentVisit(p);
             case "leaderboard":
             case "lb": return leaderboardCommand(p, args);
+            case "claimreload": return reloadPlugin(p);
             case "towninvite": return inviteToTown(p, args);
             case "jointown": return joinTown(p, args);
             case "townmembers": return showTownMembers(p);
@@ -80,6 +81,10 @@ public class CommandHandler implements CommandExecutor {
             return true;
         }
         String name = String.join(" ", args).trim();
+        if (name.length() > 15) {
+            p.sendMessage("§cTown names must be 15 characters or fewer.");
+            return true;
+        }
         UUID uuid = p.getUniqueId();
         if (towns.getTownOf(uuid).isPresent()) {
             p.sendMessage("§cYou are already in a town.");
@@ -124,9 +129,16 @@ public class CommandHandler implements CommandExecutor {
             return true;
         }
         Chunk c = p.getLocation().getChunk();
+        ChunkPos pos = ChunkPos.of(c);
         boolean bypass = p.hasPermission("visclaims.admin");
         Town town = tOpt.get();
         int max = towns.computeMaxClaims(town.getOwner());
+        if (towns.exceedsOutpostLimit(town, pos, bypass)) {
+            int allowed = towns.computeAllowedOutposts(town.getOwner());
+            int groups = towns.countClaimIslands(town);
+            p.sendMessage("§cCannot start a new outpost. Limit: §e" + allowed + "§c separate clusters; you already have §e" + groups + "§c. Expand an existing claim or increase your limit.");
+            return true;
+        }
         boolean ok = towns.claimChunk(town, c, bypass, p.getUniqueId());
         if (ok) {
             p.sendMessage("§aClaimed chunk at §e(" + c.getX() + ", " + c.getZ() + ")");
@@ -201,6 +213,10 @@ public class CommandHandler implements CommandExecutor {
             return true;
         }
         String newName = String.join(" ", args).trim();
+        if (newName.length() > 15) {
+            p.sendMessage("§cTown names must be 15 characters or fewer.");
+            return true;
+        }
         Town t = tOpt.get();
         t.setName(newName);
         towns.saveTown(t);
@@ -359,6 +375,20 @@ public class CommandHandler implements CommandExecutor {
             p.sendMessage("§cNo permission.");
             return true;
         }
+        if (args.length > 0 && args[0].equalsIgnoreCase("admin")) {
+            if (!p.hasPermission("visclaims.adminhelp")) {
+                p.sendMessage("§cNo permission.");
+                return true;
+            }
+            p.sendMessage("§c--- Admin Claim Commands ---");
+            p.sendMessage("§f/claimreload §7- Reload VisualClaims config and data");
+            p.sendMessage("§f/adjustclaims <player> <add|remove> <amount> §7- Modify bonus claims");
+            p.sendMessage("§f/warmode <on|off> §7- Toggle global war mode & scoreboards");
+            p.sendMessage("§f/warscoreboard §7- Toggle your war scoreboard view");
+            p.sendMessage("§f/admindeletetown <town> §7- Delete a town by name/owner");
+            p.sendMessage("§f/unclaim §7(with visclaims.admin) - Force unclaim any chunk");
+            return true;
+        }
         p.sendMessage("§e--- Claim Commands ---");
         p.sendMessage("§f/createtown <name> §7- Create your town");
         p.sendMessage("§f/deletetown §7- Delete your town");
@@ -369,6 +399,7 @@ public class CommandHandler implements CommandExecutor {
         p.sendMessage("§f/claimalerts §7- Toggle your own entering/leaving messages");
         p.sendMessage("§f/silentvisit §7- Toggle silent entries into other towns (permission)");
         p.sendMessage("§f/leaderboard [toggle] §7- View leaderboard or toggle the sidebar");
+        p.sendMessage("§f/claimreload §7- Admin: reload VisualClaims config/data");
         p.sendMessage("§f/settownname <name> §7- Rename your town");
         p.sendMessage("§f/settowncolor <color> §7- Change your town's color");
         p.sendMessage("§f/settowndesc <text> §7- Set your town description");
@@ -384,6 +415,9 @@ public class CommandHandler implements CommandExecutor {
         p.sendMessage("§f/claiminfo §7- Show info about your town");
         p.sendMessage("§f/claimlimit [player] §7- Show playtime-based claim limits");
         p.sendMessage("§f/claim help §7- Show this help message");
+        if (p.hasPermission("visclaims.adminhelp")) {
+            p.sendMessage("§f/claim admin §7- Show admin claim commands");
+        }
         return true;
     }
 
@@ -615,6 +649,17 @@ public class CommandHandler implements CommandExecutor {
         }
         boolean silent = towns.toggleSilentVisit(p.getUniqueId());
         p.sendMessage(silent ? "§aSilent visiting enabled. Towns will not be alerted when you enter their land." : "§cSilent visiting disabled. Towns will be alerted when you enter their land.");
+        return true;
+    }
+
+    private boolean reloadPlugin(Player p) {
+        if (!p.hasPermission("visclaims.admin")) {
+            p.sendMessage("§cNo permission.");
+            return true;
+        }
+        plugin.reloadConfig();
+        towns.reloadAll();
+        p.sendMessage("§aVisualClaims reloaded.");
         return true;
     }
 

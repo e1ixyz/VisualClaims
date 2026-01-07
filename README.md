@@ -77,6 +77,7 @@ line-weight: 2
 | `/leaderboard [toggle]` | Show top towns by claims/kills in chat or toggle the sidebar leaderboard. | `visclaims.leaderboard` | true |
 | `/claimalerts` | Toggle the chat messages when you enter or leave claimed chunks. | `visclaims.claimalerts` | true |
 | `/silentvisit` | Toggle silently entering other players' towns (no alerts sent to them). | `visclaims.silentvisit` | op |
+| `/claimreload` | Admin: reload VisualClaims config and data. | `visclaims.admin` | op |
 | `/settownname <name>` | Rename your town. | `visclaims.setname` | true |
 | `/settowncolor <color>` | Change the town colour (see list below). | `visclaims.setcolor` | true |
 | `/settowndesc <text>` | Set your town description. | `visclaims.setdesc` | true |
@@ -92,6 +93,7 @@ line-weight: 2
 | `/war <town>` | Declare/resolve war with another town (owner only). | `visclaims.war` | true |
 | `/alliance <town>|accept <town>|remove <town>` | Manage alliances (owner only). | `visclaims.alliance` | true |
 | `/claim` | Show the quick reference help. | `visclaims.help` | true |
+| `/claim admin` | Show admin-only claim commands. | `visclaims.adminhelp` | op |
 | `/warscoreboard` | Toggle your war/alliance sidebar scoreboard. | `visclaims.warscoreboard` | true |
 | `/warmode <on|off>` | Admin: enable/disable global war mode & scoreboards. | `visclaims.warmode` | op |
 | `/claimadmin` | Admin-only help list. | `visclaims.adminhelp` | op |
@@ -125,6 +127,7 @@ Playtime scaling reads the built-in `Statistic.PLAY_ONE_MINUTE` (same counter us
 - Movement messages fire whenever you cross chunk boundaries—whether you walk or teleport—so players always know when they enter or leave a town.
 - Use `/claimalerts` to mute your personal enter/leave messages. Staff (or anyone with `visclaims.silentvisit`) can toggle `/silentvisit` to avoid alerting other towns when passing through their land.
 - `/leaderboard` (alias `/lb`) shows the top 3 towns by kills, then claims, plus your own kills/deaths/claims. Add `toggle` to enable a persistent sidebar.
+- Outposts (non-contiguous claim clusters) are capped at roughly 1% of your theoretical claim limit with an exponential reduction as your cap grows. Your first claim is exempt, expansions of existing clusters are fine, and admins (`visclaims.admin`) bypass the cap. Existing outposts stay; the cap applies to creating new isolated clusters.
 
 ## Gallery
 
