@@ -786,46 +786,47 @@ public class TownManager {
         obj.setDisplaySlot(DisplaySlot.SIDEBAR);
 
         int score = 15;
+        final int TIP_SCORE = 1;
         boolean hasWars = wars != null && !wars.isEmpty();
 
         if (hasWars) {
-            obj.getScore(ChatColor.RED + "Active Wars").setScore(score--);
+            if (score > TIP_SCORE) obj.getScore(ChatColor.RED + "Active Wars").setScore(score--);
             int idx = 1;
             for (String line : wars) {
-                if (score < 1) break;
+                if (score <= TIP_SCORE) break;
                 obj.getScore(ChatColor.WHITE + "" + idx + ". " + line + ChatColor.DARK_GRAY + " w" + idx).setScore(score--);
                 idx++;
             }
             if (allies != null && !allies.isEmpty()) {
-                obj.getScore(ChatColor.AQUA + "Alliances").setScore(score--);
+                if (score > TIP_SCORE) obj.getScore(ChatColor.AQUA + "Alliances").setScore(score--);
                 idx = 1;
                 for (String line : allies) {
-                    if (score < 1) break;
+                    if (score <= TIP_SCORE) break;
                     obj.getScore(ChatColor.WHITE + "" + idx + ". " + line + ChatColor.DARK_GRAY + " a" + idx).setScore(score--);
                     idx++;
                 }
             }
         } else {
-            obj.getScore(ChatColor.AQUA + "Top Kills").setScore(score--);
+            if (score > TIP_SCORE) obj.getScore(ChatColor.AQUA + "Top Kills").setScore(score--);
             if (killsTop.isEmpty()) {
-                obj.getScore(ChatColor.GRAY + "None").setScore(score--);
+                if (score > TIP_SCORE) obj.getScore(ChatColor.GRAY + "None").setScore(score--);
             } else {
                 int idx = 1;
                 for (Town t : killsTop) {
-                    if (score < 1) break;
+                    if (score <= TIP_SCORE) break;
                     String line = ChatColor.WHITE + "" + idx + ". " + coloredTownName(t) + ChatColor.GRAY + " (" + t.getKills() + ")" + ChatColor.DARK_GRAY + " k" + idx;
                     obj.getScore(line).setScore(score--);
                     idx++;
                 }
             }
 
-            obj.getScore(ChatColor.YELLOW + "Top Claims").setScore(score--);
+            if (score > TIP_SCORE) obj.getScore(ChatColor.YELLOW + "Top Claims").setScore(score--);
             if (claimsTop.isEmpty()) {
-                obj.getScore(ChatColor.GRAY + "None").setScore(score--);
+                if (score > TIP_SCORE) obj.getScore(ChatColor.GRAY + "None").setScore(score--);
             } else {
                 int idx = 1;
                 for (Town t : claimsTop) {
-                    if (score < 1) break;
+                    if (score <= TIP_SCORE) break;
                     String line = ChatColor.WHITE + "" + idx + ". " + coloredTownName(t) + ChatColor.GRAY + " (" + t.claimCount() + ")" + ChatColor.DARK_GRAY + " c" + idx;
                     obj.getScore(line).setScore(score--);
                     idx++;
@@ -843,12 +844,13 @@ public class TownManager {
                         return stats.getClaims();
                     });
             obj.getScore(ChatColor.GRAY + "----------------" + ChatColor.DARK_GRAY + " sep").setScore(score--);
-            obj.getScore(ChatColor.GREEN + "You").setScore(score--);
-            obj.getScore(playerStatLine("Kills", stats.getKills(), "yk")).setScore(score--);
-            obj.getScore(playerStatLine("Deaths", stats.getDeaths(), "yd")).setScore(score--);
-            obj.getScore(playerStatLine("Claims", claimCount, "yc")).setScore(score--);
+            if (score > TIP_SCORE) obj.getScore(ChatColor.GREEN + "You").setScore(score--);
+            if (score > TIP_SCORE) obj.getScore(playerStatLine("Kills", stats.getKills(), "yk")).setScore(score--);
+            if (score > TIP_SCORE) obj.getScore(playerStatLine("Deaths", stats.getDeaths(), "yd")).setScore(score--);
+            if (score > TIP_SCORE) obj.getScore(playerStatLine("Claims", claimCount, "yc")).setScore(score--);
         }
 
+        obj.getScore(ChatColor.GRAY + "Hide: /lb toggle" + ChatColor.DARK_GRAY + " tip").setScore(TIP_SCORE);
         return board;
     }
 
