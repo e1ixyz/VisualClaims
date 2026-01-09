@@ -1,9 +1,9 @@
 # maximum chunks a player's town can claim
-max-claims-per-player: 64
+max-claims-per-player: 512
 
 # award chunks based on playtime (Statistic.PLAY_ONE_MINUTE); existing claims are never revoked
-use-playtime-scaling: false
-chunks-per-hour: 2
+use-playtime-scaling: true
+chunks-per-hour: 4
 
 # default town color (vanilla color names)
 default-color: GREEN

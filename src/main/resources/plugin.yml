@@ -202,10 +202,10 @@ permissions:
     description: Allows toggling autohistory
     default: true
   visclaims.war:
-    description: Allows declaring war with other towns (owners only)
+    description: Allows declaring war with other towns
     default: true
   visclaims.alliance:
-    description: Allows managing alliances (owners only)
+    description: Allows managing alliances
     default: true
   visclaims.adminhelp:
     description: Allows viewing admin claim help

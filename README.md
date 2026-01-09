@@ -8,8 +8,7 @@ VisualClaims is a Paper/Spigot plugin that lets players found towns, invite frie
 - Sync every claim to Dynmap with custom colours, configurable line weight, and fill opacity.
 - Public town listings show descriptions, members, alliances, wars, and claim counts.
 - Chunk history keeps a log of who claimed a spot and what alliances/wars were active at the time.
-- Server-wide war mode shows a live scoreboard of wars/alliances, with per-player scoreboard toggles.
-- Town leaderboard highlights leaders by claims and kills, viewable in chat or via a sidebar toggle.
+- Town leaderboard shows top claims/kills by default and switches to active wars/alliances when wars exist.
 - Territory entry notifications alert town members/owners when someone enters their land.
 - Store towns as JSON on disk for safe restarts and easy editing.
 - Simple permission scheme with an admin bypass for moderators and test servers.
@@ -43,11 +42,11 @@ The config file lives at `plugins/VisualClaims/config.yml` after first launch:
 
 ```yaml
 # maximum chunks a player's town can claim
-max-claims-per-player: 64
+max-claims-per-player: 512
 
 # award chunks based on playtime (Statistic.PLAY_ONE_MINUTE); existing claims are never revoked
-use-playtime-scaling: false
-chunks-per-hour: 2
+use-playtime-scaling: true
+chunks-per-hour: 4
 
 # default town color (vanilla color names)
 default-color: GREEN
@@ -59,7 +58,7 @@ line-weight: 2
 ```
 
 - `max-claims-per-player`: Hard cap on chunks per town; admins with `visclaims.admin` bypass it.
-- `use-playtime-scaling`: When true, the claim cap scales with playtime (2 chunks/hour by default). The cap will never force-unclaim existing land.
+- `use-playtime-scaling`: When true, the claim cap scales with playtime (4 chunks/hour by default). The cap will never force-unclaim existing land.
 - `chunks-per-hour`: Chunk allowance per played hour when playtime scaling is enabled.
 - `default-color`: Applied to newly created towns; value must match a vanilla chat colour name.
 - Marker style keys tweak the appearance of the Dynmap polygons.
@@ -113,7 +112,7 @@ Playtime scaling reads the built-in `Statistic.PLAY_ONE_MINUTE` (same counter us
 
 ### Notes
 - `/towns` lists only town names with a clickable `[Info]` button to open details, using each town's configured colour.
-- Wars and alliances are always available; active wars are shown at the bottom of the leaderboard sidebar, and alliances appear there too when wars exist.
+- Wars and alliances are always available; when wars exist the leaderboard sidebar switches to show only active wars/alliances. When no wars exist it shows the top kills/claims plus your stats.
 - Chunk history is bootstrapped on load so existing claims have a baseline entry.
 
 ### Supported Colours

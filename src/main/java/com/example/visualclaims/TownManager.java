@@ -949,10 +949,10 @@ public class TownManager {
         public int getDeaths() { return deaths; }
         public int getClaims() { return claims; }
     }
-}
     public void broadcastWarUpdate(String message) {
         for (Player p : Bukkit.getOnlinePlayers()) {
             p.sendMessage(message);
         }
         refreshLeaderboardScoreboard();
     }
+}
