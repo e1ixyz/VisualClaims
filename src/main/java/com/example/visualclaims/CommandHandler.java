@@ -483,6 +483,7 @@ public class CommandHandler implements CommandExecutor {
         p.sendMessage("§f/claimchunk §7- Claim the current chunk (or contest enemy outposts)");
         p.sendMessage("§7Contests: 1h timer (ticks only while both owners are online); holding the land wins but costs extra claims.");
         p.sendMessage("§f/contest §7- Learn about contesting land and Rock Paper Scissors");
+        p.sendMessage("§f/contest cancel §7- Forfeit your active contest (no refund)");
         p.sendMessage("§f/unclaim §7- Unclaim the current chunk");
         p.sendMessage("§f/autoclaim §7- Toggle autoclaim for chunks");
         p.sendMessage("§f/autounclaim §7- Toggle auto-unclaim for owned chunks as you move");
@@ -812,7 +813,7 @@ public class CommandHandler implements CommandExecutor {
         } else {
             int idx = 1;
             for (Town t : topKills) {
-                p.sendMessage("  §7" + idx + ". §f" + towns.coloredTownName(t) + " §7- §e" + t.getKills() + " §7kills");
+                p.sendMessage("  §7" + idx + ". §f" + towns.coloredTownNameWithReputation(t) + " §7- §e" + t.getKills() + " §7kills");
                 idx++;
             }
         }
@@ -823,7 +824,7 @@ public class CommandHandler implements CommandExecutor {
         } else {
             int idx = 1;
             for (Town t : topClaims) {
-                p.sendMessage("  §7" + idx + ". §f" + towns.coloredTownName(t) + " §7- §e" + t.claimCount() + " §7claims");
+                p.sendMessage("  §7" + idx + ". §f" + towns.coloredTownNameWithReputation(t) + " §7- §e" + t.claimCount() + " §7claims");
                 idx++;
             }
         }
@@ -854,9 +855,25 @@ public class CommandHandler implements CommandExecutor {
             p.sendMessage("§7- Leaving the outpost removes the hold-win option.");
             p.sendMessage("§7- Holding costs an extra set of claims equal to your original cost.");
             p.sendMessage("§7- If the timer ends without a win, land reverts and is immune for 7 days.");
+            p.sendMessage("§7- Use §e/contest cancel§7 to forfeit your contest (no refund).");
             p.sendMessage("§fRock Paper Scissors:");
             p.sendMessage("§7- Both owners must be online.");
             p.sendMessage("§7- Use §e/contest rps <rock|paper|scissors>§7 to choose.");
+            return true;
+        }
+        if (args[0].equalsIgnoreCase("cancel")) {
+            Optional<Town> ownerTown = towns.getTownByOwner(p.getUniqueId());
+            if (ownerTown.isEmpty()) {
+                p.sendMessage("§cOnly town owners can cancel a contest.");
+                return true;
+            }
+            ContestState contest = selectContestForChallenger(p);
+            if (contest == null) return true;
+            if (!towns.cancelContest(p.getUniqueId(), contest)) {
+                p.sendMessage("§cUnable to cancel this contest.");
+                return true;
+            }
+            p.sendMessage("§cContest canceled. Your claims are not refunded.");
             return true;
         }
         if (args[0].equalsIgnoreCase("rps")) {
@@ -885,7 +902,7 @@ public class CommandHandler implements CommandExecutor {
             return true;
         }
 
-        p.sendMessage("Usage: /contest [rps <rock|paper|scissors>]");
+        p.sendMessage("Usage: /contest [rps <rock|paper|scissors>|cancel]");
         return true;
     }
 
@@ -903,6 +920,34 @@ public class CommandHandler implements CommandExecutor {
             return byChunk;
         }
         p.sendMessage("§cYou are in multiple contests. Stand inside the contested land you want to resolve and run the command again.");
+        return null;
+    }
+
+    private ContestState selectContestForChallenger(Player p) {
+        List<ContestState> contests = towns.getContestsForOwner(p.getUniqueId());
+        if (contests.isEmpty()) {
+            p.sendMessage("§cYou are not contesting any outposts right now.");
+            return null;
+        }
+        List<ContestState> challengerContests = new ArrayList<>();
+        UUID ownerId = p.getUniqueId();
+        for (ContestState contest : contests) {
+            if (ownerId.equals(contest.getChallengerOwner())) {
+                challengerContests.add(contest);
+            }
+        }
+        if (challengerContests.isEmpty()) {
+            p.sendMessage("§cOnly the contesting town owner can cancel a contest.");
+            return null;
+        }
+        if (challengerContests.size() == 1) {
+            return challengerContests.get(0);
+        }
+        ContestState byChunk = towns.getContestByChunk(ChunkPos.of(p.getLocation().getChunk())).orElse(null);
+        if (byChunk != null && ownerId.equals(byChunk.getChallengerOwner())) {
+            return byChunk;
+        }
+        p.sendMessage("§cYou are contesting multiple outposts. Stand inside the contested land you want to cancel and run the command again.");
         return null;
     }
 

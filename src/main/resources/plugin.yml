@@ -112,8 +112,8 @@ commands:
     usage: /autohistory
     permission: visclaims.autohistory
   contest:
-    description: Show contesting rules or play Rock Paper Scissors
-    usage: /contest [rps <rock|paper|scissors>]
+    description: Show contesting rules, cancel a contest, or play Rock Paper Scissors
+    usage: /contest [rps <rock|paper|scissors>|cancel]
     permission: visclaims.contest
   alliance:
     description: Manage alliances with other towns

@@ -578,7 +578,8 @@ public class TownManager {
         KILL,
         HOLD,
         RPS,
-        EXPIRE
+        EXPIRE,
+        CANCEL
     }
 
     public enum RpsChoice {
@@ -723,6 +724,13 @@ public class TownManager {
         ContestState contest = findContestBetween(killer, victim);
         if (contest == null) return;
         resolveContest(contest, killer, ContestResolution.KILL);
+    }
+
+    public boolean cancelContest(UUID challengerOwner, ContestState contest) {
+        if (challengerOwner == null || contest == null) return false;
+        if (!challengerOwner.equals(contest.getChallengerOwner())) return false;
+        resolveContest(contest, null, ContestResolution.CANCEL);
+        return true;
     }
 
     public int getPlaytimeHours(UUID owner) {
@@ -1178,6 +1186,7 @@ public class TownManager {
             return;
         }
         ContestState contest = contestsById.values().stream()
+                .filter(this::shouldShowBossBar)
                 .min(Comparator.comparingLong(ContestState::getRemainingMs))
                 .orElse(null);
         if (contest == null) {
@@ -1187,9 +1196,6 @@ public class TownManager {
         Town defender = townsByOwner.get(contest.getDefenderOwner());
         Town challenger = townsByOwner.get(contest.getChallengerOwner());
         String title = ChatColor.RED + "Contest: " + townLabel(defender) + " vs " + townLabel(challenger);
-        if (contest.isPaused()) {
-            title += ChatColor.GRAY + " (paused)";
-        }
         if (contestBossBar == null) {
             contestBossBar = Bukkit.createBossBar(title, BarColor.RED, BarStyle.SEGMENTED_10);
         } else {
@@ -1204,6 +1210,12 @@ public class TownManager {
         for (Player p : Bukkit.getOnlinePlayers()) {
             contestBossBar.addPlayer(p);
         }
+    }
+
+    private boolean shouldShowBossBar(ContestState contest) {
+        if (contest == null) return false;
+        if (contest.isPaused()) return false;
+        return contest.isHoldEligible();
     }
 
     private void clearContestBossBar() {
@@ -1248,6 +1260,22 @@ public class TownManager {
         Town defender = townsByOwner.get(contest.getDefenderOwner());
         Town challenger = townsByOwner.get(contest.getChallengerOwner());
         int chunkCount = contest.getChunkCount();
+
+        if (resolution == ContestResolution.CANCEL) {
+            if (defender != null) {
+                for (ChunkPos pos : contest.getChunks()) {
+                    updateChunkMarker(defender, pos);
+                    recordHistory(pos, "CONTEST-CANCEL", defender);
+                    contestImmunityByChunkId.put(pos.id(), System.currentTimeMillis() + CONTEST_IMMUNITY_MS);
+                }
+                saveTown(defender);
+                saveContestImmunity();
+            }
+            saveContests();
+            broadcastContestUpdate("§7Contest canceled by §e" + townLabel(challenger) + "§7. Land returned to §e" + townLabel(defender) + "§7 (" + chunkCount + " chunks).");
+            updateContestBossBar();
+            return;
+        }
 
         if (resolution == ContestResolution.EXPIRE || winnerOwner == null) {
             if (defender != null) {
@@ -1535,7 +1563,7 @@ public class TownManager {
                 int idx = 1;
                 for (Town t : killsTop) {
                     if (score <= TIP_SCORE) break;
-                    String line = ChatColor.WHITE + "" + idx + ". " + coloredTownName(t) + ChatColor.GRAY + " (" + t.getKills() + ")";
+                    String line = ChatColor.WHITE + "" + idx + ". " + coloredTownNameWithReputation(t) + ChatColor.GRAY + " (" + t.getKills() + ")";
                     obj.getScore(uniqueLine(line, unique++)).setScore(score--);
                     idx++;
                 }
@@ -1548,7 +1576,7 @@ public class TownManager {
                 int idx = 1;
                 for (Town t : claimsTop) {
                     if (score <= TIP_SCORE) break;
-                    String line = ChatColor.WHITE + "" + idx + ". " + coloredTownName(t) + ChatColor.GRAY + " (" + t.claimCount() + ")";
+                    String line = ChatColor.WHITE + "" + idx + ". " + coloredTownNameWithReputation(t) + ChatColor.GRAY + " (" + t.claimCount() + ")";
                     obj.getScore(uniqueLine(line, unique++)).setScore(score--);
                     idx++;
                 }
@@ -1643,6 +1671,11 @@ public class TownManager {
         ChatColor color = toBukkitColor(t.getColor());
         String name = t.getName() != null ? t.getName() : ownerName(t.getOwner());
         return (color != null ? color.toString() : ChatColor.GREEN.toString()) + name + ChatColor.RESET;
+    }
+
+    public String coloredTownNameWithReputation(Town t) {
+        if (t == null) return "Unknown";
+        return formatReputation(t) + coloredTownName(t);
     }
 
     public String coloredTownName(UUID owner, String fallbackName) {
