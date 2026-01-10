@@ -18,5 +18,6 @@ public class CombatListener implements Listener {
         if (event.getEntity().getKiller() == null) return;
         if (event.getEntity().getUniqueId().equals(event.getEntity().getKiller().getUniqueId())) return;
         townManager.recordKill(event.getEntity().getKiller().getUniqueId());
+        townManager.handleContestKill(event.getEntity().getKiller().getUniqueId(), event.getEntity().getUniqueId());
     }
 }

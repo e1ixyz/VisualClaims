@@ -17,6 +17,7 @@ public class Town {
     private Set<UUID> allies = new HashSet<>();
     private Set<UUID> wars = new HashSet<>();
     private int bonusChunks = 0; // manual adjustments
+    private int contestedClaimsSpent = 0; // spent claims on contests
     private int kills = 0; // tracked town kills
 
     // For Gson
@@ -39,6 +40,9 @@ public class Town {
     public int getBonusChunks() { return bonusChunks; }
     public void addBonusChunks(int delta) { this.bonusChunks += delta; }
     public void setBonusChunks(int bonusChunks) { this.bonusChunks = bonusChunks; }
+    public int getContestedClaimsSpent() { return contestedClaimsSpent; }
+    public void addContestedClaimsSpent(int delta) { this.contestedClaimsSpent += delta; }
+    public void setContestedClaimsSpent(int contestedClaimsSpent) { this.contestedClaimsSpent = contestedClaimsSpent; }
     public String getDescription() { return description == null ? "" : description; }
     public void setDescription(String description) { this.description = description == null ? "" : description; }
 

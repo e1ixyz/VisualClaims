@@ -3,12 +3,13 @@
 VisualClaims is a Paper/Spigot plugin that lets players found towns, invite friends, visually claim chunks (no block protection), and see their borders rendered live on Dynmap. It combines lightweight gameplay commands with persistent storage and colourful map overlays so servers can offer simple land visualization without heavy setup.
 
 ### Highlights
-- Found a town, invite/join friends, view members, and manage alliances or wars between towns.
+- Found a town, invite/join friends, view members, and manage alliances between towns.
 - Claim/unclaim chunks manually or enable autoclaim and autohistory while exploring.
 - Sync every claim to Dynmap with custom colours, configurable line weight, and fill opacity.
-- Public town listings show descriptions, members, alliances, wars, and claim counts.
-- Chunk history keeps a log of who claimed a spot and what alliances/wars were active at the time.
-- Town leaderboard shows top claims/kills by default and switches to active wars/alliances when wars exist.
+- Public town listings show descriptions, members, alliances, and claim counts.
+- Chunk history keeps a log of who claimed a spot and what alliances were active at the time.
+- Town leaderboard shows top claims/kills by default and switches to the contest view when land is contested.
+- Contest enemy outposts for 1 hour (only while both owners are online); the first town owner kill decides who keeps the cluster.
 - Territory entry notifications alert town members/owners when someone enters their land.
 - Store towns as JSON on disk for safe restarts and easy editing.
 - Simple permission scheme with an admin bypass for moderators and test servers.
@@ -69,7 +70,7 @@ line-weight: 2
 | --- | --- | --- | --- |
 | `/createtown <name>` | Create your town in the current world. | `visclaims.createtown` | true |
 | `/deletetown` | Delete your town and free all chunks. | `visclaims.deletetown` | true |
-| `/claimchunk` | Claim the chunk you are standing in. | `visclaims.claim` | true |
+| `/claimchunk` | Claim the chunk you are standing in (prompts a contest if owned by another town). | `visclaims.claim` | true |
 | `/unclaim` | Unclaim the current chunk (admins can force-unclaim). | `visclaims.unclaim` | true |
 | `/autoclaim` | Toggle automatic claiming while you walk. | `visclaims.autoclaim` | true |
 | `/autounclaim` | Toggle automatic unclaiming of owned chunks as you walk. | `visclaims.autounclaim` | true |
@@ -81,7 +82,7 @@ line-weight: 2
 | `/settownname <name>` | Rename your town. | `visclaims.setname` | true |
 | `/settowncolor <color>` | Change the town colour (see list below). | `visclaims.setcolor` | true |
 | `/settowndesc <text>` | Set your town description. | `visclaims.setdesc` | true |
-| `/claiminfo` | Display your town's stats, members, allies, wars. | `visclaims.claiminfo` | true |
+| `/claiminfo` | Display your town's stats, members, and allies. | `visclaims.claiminfo` | true |
 | `/claimlimit [player]` | Show the current claim limit, playtime hours, and bonuses. Admins can target others. | `visclaims.claimlimit` | true |
 | `/claimhistory` | Show recent claim history for the current chunk. | `visclaims.history` | true |
 | `/towninvite <player>` | Invite a player to your town. | `visclaims.invite` | true |
@@ -90,7 +91,6 @@ line-weight: 2
 | `/removemember <player>` | Remove a member from your town (owner only). | `visclaims.kick` | true |
 | `/towns` | Public list of all towns, descriptions, and members. | `visclaims.towns` | true |
 | `/towninfo <town>` | Public details for a specific town. | `visclaims.towninfo` | true |
-| `/war <town>` | Declare/resolve war with another town. | `visclaims.war` | true |
 | `/alliance <town>|accept <town>|remove <town>` | Manage alliances. | `visclaims.alliance` | true |
 | `/claim` | Show the quick reference help. | `visclaims.help` | true |
 | `/claim admin` | Show admin-only claim commands. | `visclaims.adminhelp` | op |
@@ -112,7 +112,6 @@ Playtime scaling reads the built-in `Statistic.PLAY_ONE_MINUTE` (same counter us
 
 ### Notes
 - `/towns` lists only town names with a clickable `[Info]` button to open details, using each town's configured colour.
-- Wars and alliances are always available; when wars exist the leaderboard sidebar switches to show only active wars/alliances. When no wars exist it shows the top kills/claims plus your stats.
 - Chunk history is bootstrapped on load so existing claims have a baseline entry.
 
 ### Supported Colours
@@ -122,6 +121,7 @@ Playtime scaling reads the built-in `Statistic.PLAY_ONE_MINUTE` (same counter us
 - Each town is stored in `plugins/VisualClaims/towns/<owner-uuid>.json` using Gson.
 - Data is saved whenever towns or claims change and again on shutdown.
 - On startup the plugin reloads all town files, reconstructs chunk ownership, and refreshes Dynmap markers.
+- Active contests and post-contest immunity windows are stored in `plugins/VisualClaims/contests.json` and `plugins/VisualClaims/contest-immunity.json`.
 
 ## Dynmap Integration
 - The plugin registers a dedicated marker set `visualclaims.towns`.
@@ -134,6 +134,7 @@ Playtime scaling reads the built-in `Statistic.PLAY_ONE_MINUTE` (same counter us
 - Movement messages fire whenever you cross chunk boundaries—whether you walk or teleport—so players always know when they enter or leave a town.
 - Use `/claimalerts` to mute your personal enter/leave messages. Staff (or anyone with `visclaims.silentvisit`) can toggle `/silentvisit` to avoid alerting other towns when passing through their land.
 - `/leaderboard` (alias `/lb`) shows the top 3 towns by kills, then claims, plus your own kills/deaths/claims. Add `toggle` to enable a persistent sidebar.
+- Claiming another town’s chunk prompts a 1-hour outpost contest that only ticks down while both owners are online. The challenger must spend claims equal to the outpost size, the contested chunks turn gray on Dynmap, and the first owner kill wins the cluster. If no owner kill occurs, the land reverts and becomes immune from contesting for 7 days.
 - Outposts (non-contiguous claim clusters) follow a diminishing log curve: they start around 3 outposts near 512 claims and grow slowly as your claim cap rises. Your first claim is exempt, expansions of existing clusters are fine, and admins (`visclaims.admin`) bypass the cap. Existing outposts stay; the cap applies to creating new isolated clusters.
 - If you exceed your outpost cap, no new claims are allowed (including expansions) until you unclaim enough chunks to get back to or under your cap. `/claimlimit` shows your current/allowed outposts. `/autounclaim` can help shed land quickly.
 - `/trimoutposts <player> [count]` lets admins remove the smallest outpost clusters for a player if manual cleanup is needed.

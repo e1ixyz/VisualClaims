@@ -15,6 +15,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -63,7 +64,6 @@ public class CommandHandler implements CommandExecutor {
             case "removemember": return removeMember(p, args);
             case "towns": return listTowns(p);
             case "towninfo": return townInfo(p, args);
-            case "war": return warCommand(p, args);
             case "alliance": return allianceCommand(p, args);
             case "claimadmin": return claimAdminHelp(p, args);
             case "admindeletetown": return adminDeleteTown(p, args);
@@ -132,6 +132,10 @@ public class CommandHandler implements CommandExecutor {
         ChunkPos pos = ChunkPos.of(c);
         boolean bypass = p.hasPermission("visclaims.admin");
         Town town = tOpt.get();
+        Optional<Town> claimed = towns.getTownAt(c);
+        if (claimed.isPresent() && !claimed.get().getOwner().equals(town.getOwner())) {
+            return handleContestAttempt(p, town, claimed.get(), pos);
+        }
         int max = towns.computeMaxClaims(town.getOwner());
         int allowedOutposts = towns.computeAllowedOutposts(town.getOwner());
         int currentOutposts = towns.countClaimIslands(town);
@@ -154,6 +158,58 @@ public class CommandHandler implements CommandExecutor {
         return true;
     }
 
+    private boolean handleContestAttempt(Player p, Town challenger, Town defender, ChunkPos pos) {
+        Optional<ContestState> existing = towns.getContestByChunk(pos);
+        if (existing.isPresent()) {
+            ContestState contest = existing.get();
+            String defenderName = towns.coloredTownName(defender);
+            Town challengerTown = towns.getTownByOwner(contest.getChallengerOwner()).orElse(null);
+            String challengerName = challengerTown != null ? towns.coloredTownName(challengerTown) : contest.getChallengerOwner().toString();
+            long remaining = Math.max(0L, contest.getRemainingMs());
+            p.sendMessage("§cThis outpost is already contested between §e" + defenderName + "§c and §e" + challengerName + "§c. Time left: §e" + formatDuration(remaining));
+            return true;
+        }
+
+        Set<ChunkPos> cluster = towns.getClaimCluster(defender, pos);
+        if (cluster.isEmpty()) {
+            p.sendMessage("§cUnable to locate the defender outpost.");
+            return true;
+        }
+        long immunity = towns.getOutpostImmunityRemaining(cluster);
+        if (immunity > 0) {
+            p.sendMessage("§cThis outpost is protected from contesting for §e" + formatDuration(immunity) + "§c.");
+            return true;
+        }
+
+        int cost = cluster.size();
+        int available = towns.computeAvailableClaims(challenger.getOwner());
+        if (available < cost) {
+            p.sendMessage("§cYou need §e" + cost + "§c available claims to contest this outpost, but only have §e" + Math.max(0, available) + "§c.");
+            return true;
+        }
+
+        Optional<TownManager.PendingContest> pending = towns.getPendingContest(p.getUniqueId());
+        if (pending.isPresent()
+                && pending.get().getDefenderOwner().equals(defender.getOwner())
+                && pending.get().getChunkId().equals(pos.id())) {
+            towns.clearPendingContest(p.getUniqueId());
+            boolean ok = towns.startContest(challenger, defender, cluster);
+            if (!ok) {
+                p.sendMessage("§cUnable to start contest. This outpost may already be contested.");
+                return true;
+            }
+            towns.broadcastContestUpdate("§cContest started: §e" + towns.coloredTownName(challenger) + " §7vs §e" + towns.coloredTownName(defender) + " §7(" + cost + " chunks).");
+            p.sendMessage("§cYou spent §e" + cost + "§c claims to start this contest.");
+            return true;
+        }
+
+        towns.setPendingContest(p.getUniqueId(), defender.getOwner(), pos);
+        p.sendMessage("§eThis chunk belongs to §f" + towns.coloredTownName(defender) + "§e.");
+        p.sendMessage("§eContest entire outpost of §f" + cost + "§e chunks? This permanently deducts §f" + cost + "§e claims.");
+        p.sendMessage("§7Type §e/claimchunk §7again within 15 seconds to confirm.");
+        return true;
+    }
+
     private boolean unclaimChunk(Player p) {
         if (!p.hasPermission("visclaims.unclaim")) {
             p.sendMessage("§cNo permission.");
@@ -169,6 +225,10 @@ public class CommandHandler implements CommandExecutor {
             return true;
         }
         Town t = tOpt.get();
+        if (towns.isChunkContested(pos)) {
+            p.sendMessage("§cYou cannot unclaim contested chunks.");
+            return true;
+        }
         boolean ok = towns.unclaimChunk(t, pos);
 
         // Admin override: allow force-unclaim regardless of owner
@@ -224,7 +284,7 @@ public class CommandHandler implements CommandExecutor {
         Town t = tOpt.get();
         t.setName(newName);
         towns.saveTown(t);
-        if (plugin.getDynmapHook() != null) plugin.getDynmapHook().refreshTownAreas(t);
+        towns.refreshTownAreas(t);
         towns.refreshLeaderboardScoreboard();
         p.sendMessage("§aTown renamed to " + towns.coloredTownName(t));
         return true;
@@ -252,7 +312,7 @@ public class CommandHandler implements CommandExecutor {
         Town t = tOpt.get();
         t.setColor(c);
         towns.saveTown(t);
-        if (plugin.getDynmapHook() != null) plugin.getDynmapHook().refreshTownAreas(t);
+        towns.refreshTownAreas(t);
         towns.refreshLeaderboardScoreboard();
         p.sendMessage("§aTown color set to §e" + c.name());
         return true;
@@ -272,7 +332,6 @@ public class CommandHandler implements CommandExecutor {
         String ownerName = plugin.getServer().getOfflinePlayer(t.getOwner()).getName();
         List<String> memberNames = resolveNames(t.getMembers());
         List<String> allyNames = resolveTownNames(t.getAllies());
-        List<String> warNames = resolveTownNames(t.getWars());
         p.sendMessage("§e--- Town Info ---");
         p.sendMessage("§7Name: §f" + towns.coloredTownName(t));
         p.sendMessage("§7Owner: §f" + (ownerName != null ? ownerName : t.getOwner()));
@@ -281,7 +340,6 @@ public class CommandHandler implements CommandExecutor {
         p.sendMessage("§7Chunks claimed: §f" + t.claimCount());
         p.sendMessage("§7Members: §f" + (memberNames.isEmpty() ? "none" : String.join(", ", memberNames)));
         p.sendMessage("§7Allies: §f" + (allyNames.isEmpty() ? "none" : String.join(", ", allyNames)));
-        p.sendMessage("§7Wars: §f" + (warNames.isEmpty() ? "none" : String.join(", ", warNames)));
         return true;
     }
 
@@ -313,11 +371,12 @@ public class CommandHandler implements CommandExecutor {
         int playtimeHours = towns.getPlaytimeHours(t.getOwner());
         int claimed = townOpt.get().claimCount();
         int bonus = townOpt.get().getBonusChunks();
+        int contestedSpent = townOpt.get().getContestedClaimsSpent();
         int chunksPerHour = Math.max(1, plugin.getConfig().getInt("chunks-per-hour", 2));
         boolean usingPlaytime = plugin.getConfig().getBoolean("use-playtime-scaling", false);
         int baseMax = plugin.getConfig().getInt("max-claims-per-player", 64);
         int playtimeAllowance = usingPlaytime ? playtimeHours * chunksPerHour : 0;
-        int theoretical = baseMax + playtimeAllowance + bonus;
+        int theoretical = Math.max(0, baseMax + playtimeAllowance + bonus - contestedSpent);
         int limit = Math.max(theoretical, claimed);
         int overflow = Math.max(0, claimed - theoretical);
         int allowedOutposts = towns.computeAllowedOutposts(t.getOwner());
@@ -329,6 +388,9 @@ public class CommandHandler implements CommandExecutor {
             p.sendMessage("§7Playtime: §f" + playtimeHours + "h §7@ §f" + chunksPerHour + " §7chunks/hour => §f" + playtimeAllowance);
         }
         p.sendMessage("§7Bonus: §f" + bonus);
+        if (contestedSpent > 0) {
+            p.sendMessage("§7Contested claims: §c-" + contestedSpent);
+        }
         p.sendMessage("§7Allowed total: §f" + theoretical + (overflow > 0 ? " §8(overflow by " + overflow + " grandfathered)" : ""));
         p.sendMessage("§7Claims held: §f" + claimed);
         p.sendMessage("§7Effective limit (never lowers below claims): §f" + limit);
@@ -398,7 +460,7 @@ public class CommandHandler implements CommandExecutor {
         p.sendMessage("§e--- Claim Commands ---");
         p.sendMessage("§f/createtown <name> §7- Create your town");
         p.sendMessage("§f/deletetown §7- Delete your town");
-        p.sendMessage("§f/claimchunk §7- Claim the current chunk");
+        p.sendMessage("§f/claimchunk §7- Claim the current chunk (or contest enemy outposts)");
         p.sendMessage("§f/unclaim §7- Unclaim the current chunk");
         p.sendMessage("§f/autoclaim §7- Toggle autoclaim for chunks");
         p.sendMessage("§f/autounclaim §7- Toggle auto-unclaim for owned chunks as you move");
@@ -418,7 +480,6 @@ public class CommandHandler implements CommandExecutor {
         p.sendMessage("§f/towns §7- Public town listing");
         p.sendMessage("§f/towninfo <town> §7- Public town details");
         p.sendMessage("§f/claimhistory §7- Show history for the current chunk");
-        p.sendMessage("§f/war <town> §7- Declare/resolve war with another town");
         p.sendMessage("§f/alliance <town>|accept <town>|remove <town> §7- Manage alliances");
         p.sendMessage("§f/claiminfo §7- Show info about your town");
         p.sendMessage("§f/claimlimit [player] §7- Show playtime-based claim limits");
@@ -598,13 +659,11 @@ public class CommandHandler implements CommandExecutor {
         String ownerName = plugin.getServer().getOfflinePlayer(t.getOwner()).getName();
         List<String> members = resolveNames(t.getMembers());
         List<String> allies = resolveTownNames(t.getAllies());
-        List<String> wars = resolveTownNames(t.getWars());
         p.sendMessage("§e--- Town " + towns.coloredTownName(t) + "§e ---");
         p.sendMessage("§7Owner: §f" + (ownerName != null ? ownerName : t.getOwner()));
         p.sendMessage("§7Description: §f" + t.getDescription());
         p.sendMessage("§7Members: §f" + (members.isEmpty() ? "none" : String.join(", ", members)));
         p.sendMessage("§7Allies: §f" + (allies.isEmpty() ? "none" : String.join(", ", allies)));
-        p.sendMessage("§7Wars: §f" + (wars.isEmpty() ? "none" : String.join(", ", wars)));
         p.sendMessage("§7Claims: §f" + t.claimCount());
         return true;
     }
@@ -625,10 +684,9 @@ public class CommandHandler implements CommandExecutor {
         for (ChunkHistoryEntry e : entries) {
             if (shown >= 5) break;
             String allies = e.getAlliances().isEmpty() ? "none" : String.join(", ", e.getAlliances());
-            String wars = e.getWars().isEmpty() ? "none" : String.join(", ", e.getWars());
             String coloredName = towns.coloredTownName(e.getTownOwner(), e.getTownName());
             p.sendMessage("§f" + e.getAction() + " §7by " + coloredName + " §7(" + formatAgo(e.getTimestamp()) + ")");
-            p.sendMessage("§7Allies: §f" + allies + " §7Wars: §f" + wars);
+            p.sendMessage("§7Allies: §f" + allies);
             shown++;
         }
         return true;
@@ -751,43 +809,6 @@ public class CommandHandler implements CommandExecutor {
         int townClaims = towns.getTownOf(p.getUniqueId()).map(Town::claimCount).orElse(stats.getClaims());
         p.sendMessage("§aYour Stats: §fKills §e" + stats.getKills() + " §7/ §fDeaths §e" + stats.getDeaths() + " §7/ §fClaims §e" + townClaims);
         p.sendMessage("§7Use §e/leaderboard toggle §7to enable the sidebar.");
-        return true;
-    }
-
-    private boolean warCommand(Player p, String[] args) {
-        Optional<Town> myTownOpt = towns.getTownOf(p.getUniqueId());
-        if (myTownOpt.isEmpty()) {
-            p.sendMessage("§cYou need to be in a town to manage wars.");
-            return true;
-        }
-        if (args.length != 1) {
-            p.sendMessage("Usage: /war <town or owner>");
-            return true;
-        }
-        Optional<Town> targetOpt = towns.findTown(String.join(" ", args));
-        if (targetOpt.isEmpty()) {
-            p.sendMessage("§cNo matching town found.");
-            return true;
-        }
-        Town mine = myTownOpt.get();
-        Town other = targetOpt.get();
-        if (mine.getOwner().equals(other.getOwner())) {
-            p.sendMessage("§cYou cannot declare war on yourself.");
-            return true;
-        }
-        boolean alreadyWar = mine.getWars().contains(other.getOwner());
-        boolean ok = towns.toggleWar(mine.getOwner(), other.getOwner());
-        if (!ok) {
-            p.sendMessage("§cFailed to update war state.");
-            return true;
-        }
-        if (alreadyWar) {
-            String msg = "§aWar ended with §e" + towns.coloredTownName(other);
-            towns.broadcastWarUpdate(msg);
-        } else {
-            String msg = "§cWar declared on §e" + towns.coloredTownName(other);
-            towns.broadcastWarUpdate(msg);
-        }
         return true;
     }
 
@@ -927,5 +948,14 @@ public class CommandHandler implements CommandExecutor {
         if (hours < 24) return hours + "h ago";
         long days = hours / 24;
         return days + "d ago";
+    }
+
+    private String formatDuration(long millis) {
+        if (millis <= 0) return "0m";
+        long totalMinutes = millis / 60000L;
+        long hours = totalMinutes / 60;
+        long minutes = totalMinutes % 60;
+        if (hours > 0) return minutes > 0 ? hours + "h" + minutes + "m" : hours + "h";
+        return Math.max(1, minutes) + "m";
     }
 }

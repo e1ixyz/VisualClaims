@@ -111,10 +111,6 @@ commands:
     description: Toggle automatic chunk history feed
     usage: /autohistory
     permission: visclaims.autohistory
-  war:
-    description: Declare or resolve war with another town
-    usage: /war <town>
-    permission: visclaims.war
   alliance:
     description: Manage alliances with other towns
     usage: /alliance <town>|accept <town>|remove <town>
@@ -201,9 +197,6 @@ permissions:
   visclaims.autohistory:
     description: Allows toggling autohistory
     default: true
-  visclaims.war:
-    description: Allows declaring war with other towns
-    default: true
   visclaims.alliance:
     description: Allows managing alliances
     default: true
@@ -212,7 +205,4 @@ permissions:
     default: op
   visclaims.admindelete:
     description: Allows deleting any town
-    default: op
-  visclaims.admin:
-    description: Bypass limits and manage towns for testing/admin purposes
     default: op

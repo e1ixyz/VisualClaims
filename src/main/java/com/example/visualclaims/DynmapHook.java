@@ -47,6 +47,13 @@ public class DynmapHook {
     }
 
     public void addOrUpdateChunkArea(Town t, ChunkPos pos) {
+        if (t == null) return;
+        VanillaColor c = t.getColor();
+        int rgb = (c != null) ? c.rgb : VanillaColor.GREEN.rgb;
+        addOrUpdateChunkArea(t.getName(), rgb, pos);
+    }
+
+    public void addOrUpdateChunkArea(String label, int rgb, ChunkPos pos) {
         if (markerApi == null || markerSet == null) return;
         World w = Bukkit.getWorld(pos.getWorld());
         if (w == null) return;
@@ -60,15 +67,13 @@ public class DynmapHook {
         double[] y = new double[]{bz, bz, bz + 16, bz + 16};
 
         if (m == null) {
-            m = markerSet.createAreaMarker(id, t.getName(), false, pos.getWorld(), x, y, false);
+            m = markerSet.createAreaMarker(id, label, false, pos.getWorld(), x, y, false);
             markersByChunk.put(id, m);
         } else {
             m.setCornerLocations(x, y);
-            m.setLabel(t.getName());
+            m.setLabel(label);
         }
 
-        VanillaColor c = t.getColor();
-        int rgb = (c != null) ? c.rgb : VanillaColor.GREEN.rgb;
         int lineWeight = plugin.getConfig().getInt("line-weight", plugin.getConfig().getInt("line-weight", 2));
         double lineOpacity = plugin.getConfig().getDouble("line-opacity", plugin.getConfig().getDouble("line-opacity", 0.9));
         double fillOpacity = plugin.getConfig().getDouble("fill-opacity", plugin.getConfig().getDouble("fill-opacity", 0.35));

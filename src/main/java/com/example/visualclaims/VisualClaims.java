@@ -27,6 +27,7 @@ public class VisualClaims extends JavaPlugin {
         // Town manager (loads towns)
         townManager = new TownManager(this, dynmapHook);
         townManager.loadAll();
+        townManager.startContestTicker();
 
         // Register command handler
         CommandHandler handler = new CommandHandler(this, townManager);
@@ -51,7 +52,6 @@ public class VisualClaims extends JavaPlugin {
         getCommand("towns").setExecutor(handler);
         getCommand("towninfo").setExecutor(handler);
         getCommand("autohistory").setExecutor(handler);
-        getCommand("war").setExecutor(handler);
         getCommand("alliance").setExecutor(handler);
         getCommand("claimadmin").setExecutor(handler);
         getCommand("admindeletetown").setExecutor(handler);
@@ -72,7 +72,10 @@ public class VisualClaims extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        if (townManager != null) townManager.saveAll();
+        if (townManager != null) {
+            townManager.stopContestTicker();
+            townManager.saveAll();
+        }
         if (dynmapHook != null) dynmapHook.clearAll();
         getLogger().info("VisualClaims disabled.");
     }
