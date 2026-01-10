@@ -1092,8 +1092,13 @@ public class TownManager {
             if (contest.isHoldEligible() && !challengerInside) {
                 contest.setHoldEligible(false);
                 Player challengerPlayer = Bukkit.getPlayer(challenger.getOwner());
+                Player defenderPlayer = Bukkit.getPlayer(defender.getOwner());
+                String challengerName = townLabel(challenger);
                 if (challengerPlayer != null) {
-                    challengerPlayer.sendMessage("§cYou left the contested land. You can now only win by killing the owner.");
+                    challengerPlayer.sendMessage("§cYou left the contested land. You can now only win by killing the owner or Rock Paper Scissors.");
+                }
+                if (defenderPlayer != null) {
+                    defenderPlayer.sendMessage("§e" + challengerName + " §cleft the contested land. The only ways to win now are a kill or Rock Paper Scissors.");
                 }
                 updated = true;
             }
