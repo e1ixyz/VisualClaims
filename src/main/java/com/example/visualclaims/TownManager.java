@@ -8,6 +8,9 @@ import org.bukkit.ChatColor;
 import org.bukkit.Chunk;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.Statistic;
+import org.bukkit.boss.BarColor;
+import org.bukkit.boss.BarStyle;
+import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Player;
 import org.bukkit.scoreboard.DisplaySlot;
 import org.bukkit.scoreboard.Objective;
@@ -38,6 +41,26 @@ public class TownManager {
     private static final long CONTEST_DURATION_MS = 60 * 60 * 1000L;
     private static final long CONTEST_IMMUNITY_MS = 7 * 24 * 60 * 60 * 1000L;
     private static final long PENDING_CONTEST_TTL_MS = 15 * 1000L;
+    private static final long MIN_TOWN_AGE_MS = 24 * 60 * 60 * 1000L;
+    private static final long RPS_TTL_MS = 60 * 1000L;
+    private static final ChatColor[] SCOREBOARD_SUFFIXES = new ChatColor[] {
+            ChatColor.BLACK,
+            ChatColor.DARK_BLUE,
+            ChatColor.DARK_GREEN,
+            ChatColor.DARK_AQUA,
+            ChatColor.DARK_RED,
+            ChatColor.DARK_PURPLE,
+            ChatColor.GOLD,
+            ChatColor.GRAY,
+            ChatColor.DARK_GRAY,
+            ChatColor.BLUE,
+            ChatColor.GREEN,
+            ChatColor.AQUA,
+            ChatColor.RED,
+            ChatColor.LIGHT_PURPLE,
+            ChatColor.YELLOW,
+            ChatColor.WHITE
+    };
 
     // ownerUUID -> Town
     private final Map<UUID, Town> townsByOwner = new HashMap<>();
@@ -65,9 +88,12 @@ public class TownManager {
     private final Map<String, Long> contestImmunityByChunkId = new HashMap<>();
     // pending contest confirmations: player -> pending
     private final Map<UUID, PendingContest> pendingContestConfirmations = new HashMap<>();
+    // pending rock-paper-scissors choices by contest id
+    private final Map<String, PendingRps> pendingRpsByContest = new HashMap<>();
 
     private final Map<UUID, Scoreboard> leaderboardBoards = new HashMap<>();
     private BukkitTask contestTask;
+    private BossBar contestBossBar;
 
     public TownManager(VisualClaims plugin, DynmapHook dynmap) {
         this.plugin = plugin;
@@ -204,7 +230,7 @@ public class TownManager {
     public boolean forceUnclaim(ChunkPos pos) {
         ContestState contest = contestsByChunkId.get(pos.id());
         if (contest != null) {
-            resolveContest(contest, null, true);
+            resolveContest(contest, null, ContestResolution.EXPIRE);
         }
         Town t = townsByChunkId.remove(pos.id());
         if (t != null) {
@@ -368,6 +394,36 @@ public class TownManager {
         return Math.max(1, (int) Math.round(allowed));
     }
 
+    public boolean isTownOldEnough(Town t) {
+        if (t == null) return false;
+        long createdAt = t.getCreatedAt();
+        if (createdAt <= 0L) return true;
+        return System.currentTimeMillis() - createdAt >= MIN_TOWN_AGE_MS;
+    }
+
+    public long getTownAgeMs(Town t) {
+        if (t == null || t.getCreatedAt() <= 0L) return 0L;
+        return Math.max(0L, System.currentTimeMillis() - t.getCreatedAt());
+    }
+
+    public int computeContestCost(Town challenger, int outpostSize) {
+        int base = Math.max(1, outpostSize);
+        double sizeRatio = Math.min(1.0d, base / 128.0d);
+        double sizeMultiplier = 1.0d + (0.5d * sizeRatio);
+        double repMultiplier = reputationCostMultiplier(challenger != null ? challenger.getReputation() : 0);
+        double scaled = base * sizeMultiplier * repMultiplier;
+        int cost = (int) Math.ceil(scaled);
+        return Math.max(base, cost);
+    }
+
+    private double reputationCostMultiplier(int reputation) {
+        if (reputation <= -6) return 1.3d;
+        if (reputation <= -3) return 1.2d;
+        if (reputation <= -1) return 1.1d;
+        if (reputation <= 2) return 1.05d;
+        return 1.0d;
+    }
+
     public int getContestedClaimsSpent(UUID owner) {
         Town t = townsByOwner.get(owner);
         return t != null ? Math.max(0, t.getContestedClaimsSpent()) : 0;
@@ -518,6 +574,25 @@ public class TownManager {
 
     public record RemovalResult(int clusters, int chunks) {}
 
+    private enum ContestResolution {
+        KILL,
+        HOLD,
+        RPS,
+        EXPIRE
+    }
+
+    public enum RpsChoice {
+        ROCK,
+        PAPER,
+        SCISSORS;
+
+        public boolean beats(RpsChoice other) {
+            return (this == ROCK && other == SCISSORS)
+                    || (this == PAPER && other == ROCK)
+                    || (this == SCISSORS && other == PAPER);
+        }
+    }
+
     public static class PendingContest {
         private final UUID defenderOwner;
         private final String chunkId;
@@ -538,6 +613,25 @@ public class TownManager {
         }
     }
 
+    private static class PendingRps {
+        private final String contestId;
+        private final UUID ownerA;
+        private final UUID ownerB;
+        private long createdAt;
+        private final Map<UUID, RpsChoice> choices = new HashMap<>();
+
+        private PendingRps(String contestId, UUID ownerA, UUID ownerB, long createdAt) {
+            this.contestId = contestId;
+            this.ownerA = ownerA;
+            this.ownerB = ownerB;
+            this.createdAt = createdAt;
+        }
+
+        public boolean isExpired(long now) {
+            return createdAt + RPS_TTL_MS < now;
+        }
+    }
+
     public boolean exceedsOutpostLimit(Town town, ChunkPos pos, boolean bypass) {
         if (bypass || town == null) return false;
         if (town.claimCount() == 0) return false; // first claim always allowed
@@ -550,6 +644,17 @@ public class TownManager {
     public Optional<ContestState> getContestByChunk(ChunkPos pos) {
         if (pos == null) return Optional.empty();
         return Optional.ofNullable(contestsByChunkId.get(pos.id()));
+    }
+
+    public List<ContestState> getContestsForOwner(UUID owner) {
+        if (owner == null) return Collections.emptyList();
+        List<ContestState> contests = new ArrayList<>();
+        for (ContestState contest : contestsById.values()) {
+            if (owner.equals(contest.getDefenderOwner()) || owner.equals(contest.getChallengerOwner())) {
+                contests.add(contest);
+            }
+        }
+        return contests;
     }
 
     public boolean isChunkContested(ChunkPos pos) {
@@ -586,7 +691,7 @@ public class TownManager {
         pendingContestConfirmations.remove(player);
     }
 
-    public boolean startContest(Town challenger, Town defender, Set<ChunkPos> cluster) {
+    public boolean startContest(Town challenger, Town defender, Set<ChunkPos> cluster, int cost) {
         if (challenger == null || defender == null || cluster.isEmpty()) return false;
         for (ChunkPos pos : cluster) {
             if (contestsByChunkId.containsKey(pos.id())) return false;
@@ -595,10 +700,13 @@ public class TownManager {
         if (remaining > 0) return false;
         long now = System.currentTimeMillis();
         ContestState contest = new ContestState(defender.getOwner(), challenger.getOwner(), cluster, now, now + CONTEST_DURATION_MS);
+        contest.setStartCost(Math.max(1, cost));
+        contest.setHoldEligible(true);
         contest.setPaused(!(isOwnerOnline(defender.getOwner()) && isOwnerOnline(challenger.getOwner())));
         contestsById.put(contest.getId(), contest);
         indexContest(contest);
-        challenger.addContestedClaimsSpent(cluster.size());
+        challenger.addContestedClaimsSpent(Math.max(1, cost));
+        challenger.addReputation(-1);
         saveTown(challenger);
         saveContests();
         for (ChunkPos pos : cluster) {
@@ -606,6 +714,7 @@ public class TownManager {
             recordHistory(pos, "CONTEST-START", defender);
         }
         refreshLeaderboardScoreboard();
+        updateContestBossBar();
         return true;
     }
 
@@ -613,7 +722,7 @@ public class TownManager {
         if (killer == null || victim == null) return;
         ContestState contest = findContestBetween(killer, victim);
         if (contest == null) return;
-        resolveContest(contest, killer, false);
+        resolveContest(contest, killer, ContestResolution.KILL);
     }
 
     public int getPlaytimeHours(UUID owner) {
@@ -754,6 +863,10 @@ public class TownManager {
                 try (FileReader r = new FileReader(f)) {
                     Town t = gson.fromJson(r, Town.class);
                     if (t != null && t.getOwner() != null) {
+                        if (t.getCreatedAt() <= 0L) {
+                            t.setCreatedAt(System.currentTimeMillis() - MIN_TOWN_AGE_MS);
+                            saveTown(t);
+                        }
                         townsByOwner.put(t.getOwner(), t);
                         indexTown(t);
                     }
@@ -773,6 +886,7 @@ public class TownManager {
         refreshAllTownAreas();
         bootstrapHistoryForExistingClaims();
         refreshLeaderboardScoreboard();
+        updateContestBossBar();
     }
 
     public void reloadAll() {
@@ -861,6 +975,10 @@ public class TownManager {
                         remaining = contest.getEndTime() > 0 ? Math.max(0L, contest.getEndTime() - now) : CONTEST_DURATION_MS;
                     }
                     contest.setRemainingMs(Math.min(CONTEST_DURATION_MS, Math.max(0L, remaining)));
+                    if (contest.getStartCost() <= 0) {
+                        contest.setStartCost(Math.max(1, contest.getChunkCount()));
+                        contest.setHoldEligible(true);
+                    }
                     contest.setPaused(!(isOwnerOnline(contest.getDefenderOwner()) && isOwnerOnline(contest.getChallengerOwner())));
                     contest.setLastUpdated(now);
                     contestsById.put(id, contest);
@@ -922,12 +1040,12 @@ public class TownManager {
         boolean changed = false;
         for (ContestState contest : new ArrayList<>(contestsById.values())) {
             if (townsByOwner.get(contest.getDefenderOwner()) == null || townsByOwner.get(contest.getChallengerOwner()) == null) {
-                resolveContest(contest, null, true);
+                resolveContest(contest, null, ContestResolution.EXPIRE);
                 changed = true;
                 continue;
             }
             if (contest.getRemainingMs() <= 0) {
-                resolveContest(contest, null, true);
+                resolveContest(contest, null, ContestResolution.EXPIRE);
                 changed = true;
             }
         }
@@ -941,14 +1059,14 @@ public class TownManager {
             Town defender = townsByOwner.get(contest.getDefenderOwner());
             Town challenger = townsByOwner.get(contest.getChallengerOwner());
             if (defender == null || challenger == null) {
-                resolveContest(contest, null, true);
+                resolveContest(contest, null, ContestResolution.EXPIRE);
                 updated = true;
                 continue;
             }
 
             long remaining = contest.getRemainingMs();
             if (remaining <= 0) {
-                resolveContest(contest, null, true);
+                resolveContest(contest, null, ContestResolution.EXPIRE);
                 updated = true;
                 continue;
             }
@@ -957,9 +1075,18 @@ public class TownManager {
             if (last <= 0) last = now;
 
             boolean bothOnline = isOwnerOnline(defender.getOwner()) && isOwnerOnline(challenger.getOwner());
+            boolean challengerInside = isOwnerInContest(challenger.getOwner(), contest);
             boolean pausedNow = !bothOnline;
             if (contest.isPaused() != pausedNow) {
                 contest.setPaused(pausedNow);
+                updated = true;
+            }
+            if (contest.isHoldEligible() && !challengerInside) {
+                contest.setHoldEligible(false);
+                Player challengerPlayer = Bukkit.getPlayer(challenger.getOwner());
+                if (challengerPlayer != null) {
+                    challengerPlayer.sendMessage("§cYou left the contested land. You can now only win by killing the owner.");
+                }
                 updated = true;
             }
             if (bothOnline) {
@@ -973,12 +1100,118 @@ public class TownManager {
 
             contest.setLastUpdated(now);
             if (remaining <= 0) {
-                resolveContest(contest, null, true);
+                if (contest.isHoldEligible() && challengerInside) {
+                    resolveContest(contest, contest.getChallengerOwner(), ContestResolution.HOLD);
+                } else {
+                    resolveContest(contest, null, ContestResolution.EXPIRE);
+                }
                 updated = true;
             }
         }
         if (updated) saveContests();
+        updateContestBossBar();
         return updated;
+    }
+
+    public String handleRpsChoice(Player player, ContestState contest, RpsChoice choice) {
+        if (player == null || contest == null || choice == null) return "§cUnable to start Rock Paper Scissors right now.";
+        UUID owner = player.getUniqueId();
+        UUID defenderOwner = contest.getDefenderOwner();
+        UUID challengerOwner = contest.getChallengerOwner();
+        if (!owner.equals(defenderOwner) && !owner.equals(challengerOwner)) {
+            return "§cOnly the two town owners in the contest can use Rock Paper Scissors.";
+        }
+        if (!isOwnerOnline(defenderOwner) || !isOwnerOnline(challengerOwner)) {
+            return "§cBoth town owners must be online to play Rock Paper Scissors.";
+        }
+
+        long now = System.currentTimeMillis();
+        PendingRps pending = pendingRpsByContest.get(contest.getId());
+        if (pending == null || pending.isExpired(now)) {
+            pending = new PendingRps(contest.getId(), defenderOwner, challengerOwner, now);
+            pendingRpsByContest.put(contest.getId(), pending);
+        }
+
+        pending.choices.put(owner, choice);
+        pending.createdAt = now;
+
+        UUID otherOwner = owner.equals(defenderOwner) ? challengerOwner : defenderOwner;
+        Player other = Bukkit.getPlayer(otherOwner);
+
+        if (!pending.choices.containsKey(otherOwner)) {
+            if (other != null) {
+                other.sendMessage("§eRock Paper Scissors challenge: §f" + townLabel(townsByOwner.get(owner)) + " §ehas chosen. Use §f/contest rps <rock|paper|scissors> §ewithin 60s.");
+            }
+            return "§aYou chose §f" + choice.name().toLowerCase(Locale.ROOT) + "§a. Waiting for the other owner.";
+        }
+
+        RpsChoice otherChoice = pending.choices.get(otherOwner);
+        if (choice == otherChoice) {
+            pending.choices.clear();
+            pending.createdAt = now;
+            if (other != null) {
+                other.sendMessage("§eRPS tied (" + otherChoice.name().toLowerCase(Locale.ROOT) + " vs " + choice.name().toLowerCase(Locale.ROOT) + "). Choose again.");
+            }
+            return "§eRPS tied (" + choice.name().toLowerCase(Locale.ROOT) + " vs " + otherChoice.name().toLowerCase(Locale.ROOT) + "). Choose again with /contest rps <rock|paper|scissors>.";
+        }
+
+        UUID winner = choice.beats(otherChoice) ? owner : otherOwner;
+        String winningChoice = choice.beats(otherChoice) ? choice.name().toLowerCase(Locale.ROOT) : otherChoice.name().toLowerCase(Locale.ROOT);
+        String losingChoice = choice.beats(otherChoice) ? otherChoice.name().toLowerCase(Locale.ROOT) : choice.name().toLowerCase(Locale.ROOT);
+        if (other != null) {
+            if (winner.equals(otherOwner)) {
+                other.sendMessage("§aYou won Rock Paper Scissors (" + winningChoice + " beats " + losingChoice + ").");
+            } else {
+                other.sendMessage("§cYou lost Rock Paper Scissors (" + winningChoice + " beats " + losingChoice + ").");
+            }
+        }
+        pendingRpsByContest.remove(contest.getId());
+        resolveContest(contest, winner, ContestResolution.RPS);
+        return winner.equals(owner)
+                ? "§aYou won Rock Paper Scissors (" + winningChoice + " beats " + losingChoice + ")."
+                : "§cYou lost Rock Paper Scissors (" + winningChoice + " beats " + losingChoice + ").";
+    }
+
+    private void updateContestBossBar() {
+        if (contestsById.isEmpty()) {
+            clearContestBossBar();
+            return;
+        }
+        ContestState contest = contestsById.values().stream()
+                .min(Comparator.comparingLong(ContestState::getRemainingMs))
+                .orElse(null);
+        if (contest == null) {
+            clearContestBossBar();
+            return;
+        }
+        Town defender = townsByOwner.get(contest.getDefenderOwner());
+        Town challenger = townsByOwner.get(contest.getChallengerOwner());
+        String title = ChatColor.RED + "Contest: " + townLabel(defender) + " vs " + townLabel(challenger);
+        if (contest.isPaused()) {
+            title += ChatColor.GRAY + " (paused)";
+        }
+        if (contestBossBar == null) {
+            contestBossBar = Bukkit.createBossBar(title, BarColor.RED, BarStyle.SEGMENTED_10);
+        } else {
+            contestBossBar.setTitle(title);
+        }
+        double progress = 1.0d - (contest.getRemainingMs() / (double) CONTEST_DURATION_MS);
+        if (progress < 0.0d) progress = 0.0d;
+        if (progress > 1.0d) progress = 1.0d;
+        contestBossBar.setProgress(progress);
+        contestBossBar.setVisible(true);
+        contestBossBar.removeAll();
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            contestBossBar.addPlayer(p);
+        }
+    }
+
+    private void clearContestBossBar() {
+        if (contestBossBar != null) {
+            contestBossBar.removeAll();
+            contestBossBar.setVisible(false);
+            contestBossBar = null;
+        }
     }
 
     private ContestState findContestBetween(UUID ownerA, UUID ownerB) {
@@ -999,13 +1232,14 @@ public class TownManager {
         if (owner == null) return;
         for (ContestState contest : new ArrayList<>(contestsById.values())) {
             if (owner.equals(contest.getDefenderOwner()) || owner.equals(contest.getChallengerOwner())) {
-                resolveContest(contest, null, true);
+                resolveContest(contest, null, ContestResolution.EXPIRE);
             }
         }
     }
 
-    private void resolveContest(ContestState contest, UUID winnerOwner, boolean expired) {
+    private void resolveContest(ContestState contest, UUID winnerOwner, ContestResolution resolution) {
         if (contest == null) return;
+        pendingRpsByContest.remove(contest.getId());
         contestsById.remove(contest.getId());
         for (ChunkPos pos : contest.getChunks()) {
             contestsByChunkId.remove(pos.id());
@@ -1015,7 +1249,7 @@ public class TownManager {
         Town challenger = townsByOwner.get(contest.getChallengerOwner());
         int chunkCount = contest.getChunkCount();
 
-        if (expired || winnerOwner == null) {
+        if (resolution == ContestResolution.EXPIRE || winnerOwner == null) {
             if (defender != null) {
                 for (ChunkPos pos : contest.getChunks()) {
                     updateChunkMarker(defender, pos);
@@ -1027,6 +1261,7 @@ public class TownManager {
             }
             saveContests();
             broadcastContestUpdate("§7Contest expired between §e" + townLabel(defender) + "§7 and §e" + townLabel(challenger) + "§7 (" + chunkCount + " chunks).");
+            updateContestBossBar();
             return;
         }
 
@@ -1036,6 +1271,7 @@ public class TownManager {
                 for (ChunkPos pos : contest.getChunks()) updateChunkMarker(defender, pos);
             }
             saveContests();
+            updateContestBossBar();
             return;
         }
 
@@ -1051,7 +1287,16 @@ public class TownManager {
                 winner.addClaim(pos);
                 townsByChunkId.put(pos.id(), winner);
                 updateChunkMarker(winner, pos);
-                recordHistory(pos, "CONTEST-WIN", winner);
+                recordHistory(pos, resolution == ContestResolution.HOLD ? "CONTEST-HOLD" : "CONTEST-WIN", winner);
+            }
+            if (resolution == ContestResolution.HOLD && challenger != null) {
+                int extraCost = Math.max(1, contest.getStartCost());
+                challenger.addContestedClaimsSpent(extraCost);
+                saveTown(challenger);
+                Player challengerPlayer = Bukkit.getPlayer(challenger.getOwner());
+                if (challengerPlayer != null) {
+                    challengerPlayer.sendMessage("§cHolding the outpost cost an extra §e" + extraCost + "§c claims.");
+                }
             }
             saveTown(winner);
         } else if (defender != null) {
@@ -1064,10 +1309,19 @@ public class TownManager {
 
         saveContests();
         if (winnerIsDefender) {
-            broadcastContestUpdate("§a" + townLabel(winner) + " §7defended their outpost (" + chunkCount + " chunks).");
+            if (resolution == ContestResolution.RPS) {
+                broadcastContestUpdate("§a" + townLabel(winner) + " §7defended their outpost via Rock Paper Scissors (" + chunkCount + " chunks).");
+            } else {
+                broadcastContestUpdate("§a" + townLabel(winner) + " §7defended their outpost (" + chunkCount + " chunks).");
+            }
+        } else if (resolution == ContestResolution.HOLD) {
+            broadcastContestUpdate("§c" + townLabel(winner) + " §7won by occupying the outpost (" + chunkCount + " chunks).");
+        } else if (resolution == ContestResolution.RPS) {
+            broadcastContestUpdate("§c" + townLabel(winner) + " §7won via Rock Paper Scissors (" + chunkCount + " chunks).");
         } else {
             broadcastContestUpdate("§c" + townLabel(winner) + " §7won a contest over §e" + townLabel(defender) + "§7 (" + chunkCount + " chunks).");
         }
+        updateContestBossBar();
     }
 
     private void updateChunkMarker(Town owner, ChunkPos pos) {
@@ -1183,18 +1437,30 @@ public class TownManager {
 
     private String formatRemaining(long millis) {
         if (millis <= 0) return "0m";
-        long totalMinutes = millis / 60000L;
-        long hours = totalMinutes / 60;
-        long minutes = totalMinutes % 60;
+        long totalSeconds = millis / 1000L;
+        long hours = totalSeconds / 3600L;
+        long minutes = (totalSeconds % 3600L) / 60L;
+        long seconds = totalSeconds % 60L;
         if (hours > 0) {
             return minutes > 0 ? hours + "h" + minutes + "m" : hours + "h";
         }
-        return Math.max(1, minutes) + "m";
+        if (minutes > 0) {
+            return minutes + "m" + (seconds > 0 ? seconds + "s" : "");
+        }
+        return Math.max(1, seconds) + "s";
     }
 
     private boolean isOwnerOnline(UUID owner) {
         Player p = owner == null ? null : Bukkit.getPlayer(owner);
         return p != null && p.isOnline();
+    }
+
+    private boolean isOwnerInContest(UUID owner, ContestState contest) {
+        if (owner == null || contest == null) return false;
+        Player p = Bukkit.getPlayer(owner);
+        if (p == null || !p.isOnline()) return false;
+        ChunkPos pos = ChunkPos.of(p.getLocation().getChunk());
+        return contest.containsChunk(pos);
     }
 
     public void applyScoreboard(Player p) {
@@ -1249,40 +1515,41 @@ public class TownManager {
         obj.setDisplaySlot(DisplaySlot.SIDEBAR);
 
         int score = 15;
+        int unique = 0;
         final int TIP_SCORE = 1;
         boolean hasContests = contests != null && !contests.isEmpty();
 
         if (hasContests) {
-            if (score > TIP_SCORE) obj.getScore(ChatColor.RED + "Contest Chunks").setScore(score--);
+            if (score > TIP_SCORE) obj.getScore(uniqueLine(ChatColor.RED + "Contest Chunks", unique++)).setScore(score--);
             int idx = 1;
             for (String line : contests) {
                 if (score <= TIP_SCORE) break;
-                obj.getScore(ChatColor.WHITE + "" + idx + ". " + line + ChatColor.DARK_GRAY + " ct" + idx).setScore(score--);
+                obj.getScore(uniqueLine(ChatColor.WHITE + "" + idx + ". " + line, unique++)).setScore(score--);
                 idx++;
             }
         } else {
-            if (score > TIP_SCORE) obj.getScore(ChatColor.AQUA + "Top Kills").setScore(score--);
+            if (score > TIP_SCORE) obj.getScore(uniqueLine(ChatColor.AQUA + "Top Kills", unique++)).setScore(score--);
             if (killsTop.isEmpty()) {
-                if (score > TIP_SCORE) obj.getScore(ChatColor.GRAY + "None").setScore(score--);
+                if (score > TIP_SCORE) obj.getScore(uniqueLine(ChatColor.GRAY + "None", unique++)).setScore(score--);
             } else {
                 int idx = 1;
                 for (Town t : killsTop) {
                     if (score <= TIP_SCORE) break;
-                    String line = ChatColor.WHITE + "" + idx + ". " + coloredTownName(t) + ChatColor.GRAY + " (" + t.getKills() + ")" + ChatColor.DARK_GRAY + " k" + idx;
-                    obj.getScore(line).setScore(score--);
+                    String line = ChatColor.WHITE + "" + idx + ". " + coloredTownName(t) + ChatColor.GRAY + " (" + t.getKills() + ")";
+                    obj.getScore(uniqueLine(line, unique++)).setScore(score--);
                     idx++;
                 }
             }
 
-            if (score > TIP_SCORE) obj.getScore(ChatColor.YELLOW + "Top Claims").setScore(score--);
+            if (score > TIP_SCORE) obj.getScore(uniqueLine(ChatColor.YELLOW + "Top Claims", unique++)).setScore(score--);
             if (claimsTop.isEmpty()) {
-                if (score > TIP_SCORE) obj.getScore(ChatColor.GRAY + "None").setScore(score--);
+                if (score > TIP_SCORE) obj.getScore(uniqueLine(ChatColor.GRAY + "None", unique++)).setScore(score--);
             } else {
                 int idx = 1;
                 for (Town t : claimsTop) {
                     if (score <= TIP_SCORE) break;
-                    String line = ChatColor.WHITE + "" + idx + ". " + coloredTownName(t) + ChatColor.GRAY + " (" + t.claimCount() + ")" + ChatColor.DARK_GRAY + " c" + idx;
-                    obj.getScore(line).setScore(score--);
+                    String line = ChatColor.WHITE + "" + idx + ". " + coloredTownName(t) + ChatColor.GRAY + " (" + t.claimCount() + ")";
+                    obj.getScore(uniqueLine(line, unique++)).setScore(score--);
                     idx++;
                 }
             }
@@ -1297,19 +1564,24 @@ public class TownManager {
                         }
                         return stats.getClaims();
                     });
-            obj.getScore(ChatColor.GRAY + "----------------" + ChatColor.DARK_GRAY + " sep").setScore(score--);
-            if (score > TIP_SCORE) obj.getScore(ChatColor.GREEN + "You").setScore(score--);
-            if (score > TIP_SCORE) obj.getScore(playerStatLine("Kills", stats.getKills(), "yk")).setScore(score--);
-            if (score > TIP_SCORE) obj.getScore(playerStatLine("Deaths", stats.getDeaths(), "yd")).setScore(score--);
-            if (score > TIP_SCORE) obj.getScore(playerStatLine("Claims", claimCount, "yc")).setScore(score--);
+            obj.getScore(uniqueLine(ChatColor.GRAY + "----------------", unique++)).setScore(score--);
+            if (score > TIP_SCORE) obj.getScore(uniqueLine(ChatColor.GREEN + "You", unique++)).setScore(score--);
+            if (score > TIP_SCORE) obj.getScore(uniqueLine(playerStatLine("Kills", stats.getKills()), unique++)).setScore(score--);
+            if (score > TIP_SCORE) obj.getScore(uniqueLine(playerStatLine("Deaths", stats.getDeaths()), unique++)).setScore(score--);
+            if (score > TIP_SCORE) obj.getScore(uniqueLine(playerStatLine("Claims", claimCount), unique++)).setScore(score--);
         }
 
-        obj.getScore(ChatColor.GRAY + "Hide: /lb toggle" + ChatColor.DARK_GRAY + " tip").setScore(TIP_SCORE);
+        obj.getScore(uniqueLine(ChatColor.GRAY + "Hide this with /lb toggle", unique++)).setScore(TIP_SCORE);
         return board;
     }
 
-    private String playerStatLine(String label, int value, String code) {
-        return ChatColor.WHITE + label + ": " + ChatColor.YELLOW + value + ChatColor.DARK_GRAY + " " + code;
+    private String playerStatLine(String label, int value) {
+        return ChatColor.WHITE + label + ": " + ChatColor.YELLOW + value;
+    }
+
+    private String uniqueLine(String line, int index) {
+        ChatColor suffix = SCOREBOARD_SUFFIXES[index % SCOREBOARD_SUFFIXES.length];
+        return line + suffix;
     }
 
     private String townLabel(Town t) {
@@ -1386,6 +1658,27 @@ public class TownManager {
         return ChatColor.GRAY + "Unknown" + ChatColor.RESET;
     }
 
+    public String formatReputation(Town t) {
+        int rep = t != null ? t.getReputation() : 0;
+        if (rep <= -6) return ChatColor.DARK_RED + "---" + ChatColor.RESET;
+        if (rep <= -3) return ChatColor.RED + "--" + ChatColor.RESET;
+        if (rep <= -1) return ChatColor.GOLD + "-" + ChatColor.RESET;
+        if (rep <= 2) return ChatColor.YELLOW + "+" + ChatColor.RESET;
+        return ChatColor.GREEN + "++" + ChatColor.RESET;
+    }
+
+    public String formatTownAge(Town t) {
+        long ageMs = getTownAgeMs(t);
+        if (ageMs <= 0L) return "unknown";
+        long hours = ageMs / (60L * 60L * 1000L);
+        long days = hours / 24L;
+        long remHours = hours % 24L;
+        if (days > 0) {
+            return days + "d " + remHours + "h";
+        }
+        return hours + "h";
+    }
+
     private void bootstrapHistoryForExistingClaims() {
         for (Town t : townsByOwner.values()) {
             for (ChunkPos pos : t.getClaims()) {
@@ -1422,6 +1715,7 @@ public class TownManager {
             contestTask.cancel();
             contestTask = null;
         }
+        clearContestBossBar();
     }
 
     public void broadcastContestUpdate(String message) {

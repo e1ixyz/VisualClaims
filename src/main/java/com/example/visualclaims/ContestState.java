@@ -14,6 +14,8 @@ public class ContestState {
     private long remainingMs;
     private long lastUpdated;
     private boolean paused;
+    private boolean holdEligible = true;
+    private int startCost;
 
     public ContestState() {}
 
@@ -33,6 +35,7 @@ public class ContestState {
     public UUID getDefenderOwner() { return defenderOwner; }
     public UUID getChallengerOwner() { return challengerOwner; }
     public Set<ChunkPos> getChunks() { return chunks == null ? new HashSet<>() : new HashSet<>(chunks); }
+    public boolean containsChunk(ChunkPos pos) { return chunks != null && pos != null && chunks.contains(pos); }
     public long getStartTime() { return startTime; }
     public long getEndTime() { return endTime; }
     public long getRemainingMs() { return remainingMs; }
@@ -41,6 +44,10 @@ public class ContestState {
     public void setLastUpdated(long lastUpdated) { this.lastUpdated = lastUpdated; }
     public boolean isPaused() { return paused; }
     public void setPaused(boolean paused) { this.paused = paused; }
+    public boolean isHoldEligible() { return holdEligible; }
+    public void setHoldEligible(boolean holdEligible) { this.holdEligible = holdEligible; }
+    public int getStartCost() { return startCost; }
+    public void setStartCost(int startCost) { this.startCost = startCost; }
 
     public int getChunkCount() { return chunks == null ? 0 : chunks.size(); }
 

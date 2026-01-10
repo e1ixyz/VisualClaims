@@ -52,6 +52,7 @@ public class VisualClaims extends JavaPlugin {
         getCommand("towns").setExecutor(handler);
         getCommand("towninfo").setExecutor(handler);
         getCommand("autohistory").setExecutor(handler);
+        getCommand("contest").setExecutor(handler);
         getCommand("alliance").setExecutor(handler);
         getCommand("claimadmin").setExecutor(handler);
         getCommand("admindeletetown").setExecutor(handler);

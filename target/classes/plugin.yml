@@ -111,6 +111,10 @@ commands:
     description: Toggle automatic chunk history feed
     usage: /autohistory
     permission: visclaims.autohistory
+  contest:
+    description: Show contesting rules or play Rock Paper Scissors
+    usage: /contest [rps <rock|paper|scissors>]
+    permission: visclaims.contest
   alliance:
     description: Manage alliances with other towns
     usage: /alliance <town>|accept <town>|remove <town>
@@ -196,6 +200,9 @@ permissions:
     default: true
   visclaims.autohistory:
     description: Allows toggling autohistory
+    default: true
+  visclaims.contest:
+    description: Allows viewing contest rules and playing Rock Paper Scissors
     default: true
   visclaims.alliance:
     description: Allows managing alliances

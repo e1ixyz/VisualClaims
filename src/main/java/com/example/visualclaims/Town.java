@@ -19,6 +19,8 @@ public class Town {
     private int bonusChunks = 0; // manual adjustments
     private int contestedClaimsSpent = 0; // spent claims on contests
     private int kills = 0; // tracked town kills
+    private long createdAt = 0L;
+    private int reputation = 0;
 
     // For Gson
     public Town() {}
@@ -28,6 +30,7 @@ public class Town {
         this.name = name;
         this.world = world;
         this.colorName = colorName;
+        this.createdAt = System.currentTimeMillis();
     }
 
     public UUID getOwner() { return owner; }
@@ -70,4 +73,16 @@ public class Town {
     public int getKills() { return kills; }
     public void addKill() { this.kills++; }
     public void setKills(int kills) { this.kills = kills; }
+
+    public long getCreatedAt() { return createdAt; }
+    public void setCreatedAt(long createdAt) { this.createdAt = createdAt; }
+
+    public int getReputation() { return reputation; }
+    public void setReputation(int reputation) { this.reputation = reputation; }
+    public void addReputation(int delta) {
+        int next = this.reputation + delta;
+        if (next > 10) next = 10;
+        if (next < -10) next = -10;
+        this.reputation = next;
+    }
 }
