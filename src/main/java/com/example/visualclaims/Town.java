@@ -7,6 +7,9 @@ import java.util.Set;
 import java.util.UUID;
 
 public class Town {
+    public static final int MAX_REPUTATION = 10;
+    public static final int MIN_REPUTATION = -10;
+
     private UUID owner;
     private String name;
     private String world;
@@ -20,7 +23,7 @@ public class Town {
     private int contestedClaimsSpent = 0; // spent claims on contests
     private int kills = 0; // tracked town kills
     private long createdAt = 0L;
-    private int reputation = 0;
+    private int reputation = MAX_REPUTATION;
 
     // For Gson
     public Town() {}
@@ -31,6 +34,7 @@ public class Town {
         this.world = world;
         this.colorName = colorName;
         this.createdAt = System.currentTimeMillis();
+        this.reputation = MAX_REPUTATION;
     }
 
     public UUID getOwner() { return owner; }
@@ -81,8 +85,8 @@ public class Town {
     public void setReputation(int reputation) { this.reputation = reputation; }
     public void addReputation(int delta) {
         int next = this.reputation + delta;
-        if (next > 10) next = 10;
-        if (next < -10) next = -10;
+        if (next > MAX_REPUTATION) next = MAX_REPUTATION;
+        if (next < MIN_REPUTATION) next = MIN_REPUTATION;
         this.reputation = next;
     }
 }

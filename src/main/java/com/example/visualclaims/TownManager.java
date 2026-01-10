@@ -871,8 +871,22 @@ public class TownManager {
                 try (FileReader r = new FileReader(f)) {
                     Town t = gson.fromJson(r, Town.class);
                     if (t != null && t.getOwner() != null) {
+                        boolean changed = false;
                         if (t.getCreatedAt() <= 0L) {
                             t.setCreatedAt(System.currentTimeMillis() - MIN_TOWN_AGE_MS);
+                            changed = true;
+                        }
+                        if (t.getReputation() == 0) {
+                            t.setReputation(Town.MAX_REPUTATION);
+                            changed = true;
+                        } else if (t.getReputation() > Town.MAX_REPUTATION) {
+                            t.setReputation(Town.MAX_REPUTATION);
+                            changed = true;
+                        } else if (t.getReputation() < Town.MIN_REPUTATION) {
+                            t.setReputation(Town.MIN_REPUTATION);
+                            changed = true;
+                        }
+                        if (changed) {
                             saveTown(t);
                         }
                         townsByOwner.put(t.getOwner(), t);
