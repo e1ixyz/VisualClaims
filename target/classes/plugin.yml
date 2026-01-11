@@ -83,6 +83,10 @@ commands:
     description: "Admin: add or remove bonus claim slots"
     usage: /adjustclaims <player> <add|remove> <amount>
     permission: visclaims.admin
+  transferoutpost:
+    description: Transfer the current outpost to another town (owner only)
+    usage: /transferoutpost <town>
+    permission: visclaims.transferoutpost
   towninvite:
     description: Invite a player to your town
     usage: /towninvite <player>
@@ -104,8 +108,8 @@ commands:
     usage: /towns
     permission: visclaims.towns
   towninfo:
-    description: Public town details
-    usage: /towninfo <town>
+    description: View town details (defaults to yours)
+    usage: /towninfo [town]
     permission: visclaims.towninfo
   autohistory:
     description: Toggle automatic chunk history feed
@@ -179,6 +183,9 @@ permissions:
     default: op
   visclaims.claimlimit:
     description: Allows using /claimlimit to view claim limits (admins can target others)
+    default: true
+  visclaims.transferoutpost:
+    description: Allows transferring the current outpost to another town
     default: true
   visclaims.invite:
     description: Allows inviting players to a town

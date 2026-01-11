@@ -20,6 +20,7 @@ public class MoveListener implements Listener {
     private final Map<UUID, String> lastTownAt = new HashMap<>();
     private final Map<UUID, UUID> lastTownOwner = new HashMap<>();
     private final Map<UUID, String> lastChunkId = new HashMap<>();
+    private final Map<UUID, String> lastAreaLabel = new HashMap<>();
     private final Set<UUID> hiddenChunkMessages = new HashSet<>();
 
     public MoveListener(VisualClaims plugin, TownManager townManager) {
@@ -94,6 +95,7 @@ public class MoveListener implements Listener {
         lastTownAt.remove(id);
         lastTownOwner.remove(id);
         lastChunkId.remove(id);
+        lastAreaLabel.remove(id);
         hiddenChunkMessages.remove(id);
     }
 
@@ -109,37 +111,41 @@ public class MoveListener implements Listener {
 
         lastChunkId.put(p.getUniqueId(), id);
         Optional<Town> atTown = townManager.getTownAt(to);
-        updateTownPresence(p, atTown);
+        updateTownPresence(p, atTown, pos);
         handleAutoclaim(p, to, atTown);
         handleAutohistory(p, pos);
         handleAutounclaim(p, pos);
     }
 
-    private void updateTownPresence(Player p, Optional<Town> atTown) {
+    private void updateTownPresence(Player p, Optional<Town> atTown, ChunkPos pos) {
         UUID uuid = p.getUniqueId();
         Town currentTown = atTown.orElse(null);
         UUID currentOwner = currentTown != null ? currentTown.getOwner() : null;
-        UUID prevOwner = lastTownOwner.get(uuid);
-        String prevTownName = lastTownAt.get(uuid);
-        Town prevTown = prevOwner == null ? null : townManager.getTownByOwner(prevOwner).orElse(null);
-        if (prevTown == null && prevTownName != null) {
-            prevTown = townManager.findTown(prevTownName).orElse(null);
-        }
         boolean showMessages = shouldShowChunkMessages(uuid);
 
-        if (!Objects.equals(prevOwner, currentOwner)) {
-            if (prevTown != null || prevTownName != null) {
-                String label = townManager.coloredTownName(prevOwner, prevTownName);
-                if (showMessages) p.sendMessage("§7Now leaving " + label);
+        String contestLabel = townManager.getContestLabel(pos);
+        String currentLabel = contestLabel != null ? contestLabel : (currentTown != null ? townManager.coloredTownName(currentTown) : null);
+        String prevLabel = lastAreaLabel.get(uuid);
+
+        if (!Objects.equals(prevLabel, currentLabel)) {
+            if (prevLabel != null && showMessages) {
+                p.sendMessage("§7Now leaving " + prevLabel);
+            }
+            if (currentLabel != null && showMessages) {
+                p.sendMessage("§7Now entering " + currentLabel);
             }
             if (currentTown != null) {
-                if (showMessages) p.sendMessage("§7Now entering " + townManager.coloredTownName(currentTown));
                 notifyTownEntry(p, currentTown);
                 lastTownAt.put(uuid, currentTown.getName());
                 lastTownOwner.put(uuid, currentOwner);
             } else {
                 lastTownAt.remove(uuid);
                 lastTownOwner.remove(uuid);
+            }
+            if (currentLabel != null) {
+                lastAreaLabel.put(uuid, currentLabel);
+            } else {
+                lastAreaLabel.remove(uuid);
             }
         }
     }

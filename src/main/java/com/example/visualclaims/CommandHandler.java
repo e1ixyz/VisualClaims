@@ -52,6 +52,7 @@ public class CommandHandler implements CommandExecutor {
             case "claim": return claimHelp(p, args);
             case "claimlimit": return claimLimit(p, args);
             case "adjustclaims": return adjustClaims(p, args);
+            case "transferoutpost": return transferOutpost(p, args);
             case "claimalerts": return toggleClaimAlerts(p);
             case "silentvisit": return toggleSilentVisit(p);
             case "leaderboard":
@@ -346,20 +347,7 @@ public class CommandHandler implements CommandExecutor {
             p.sendMessage("§cYou are not in a town.");
             return true;
         }
-        Town t = tOpt.get();
-        String ownerName = plugin.getServer().getOfflinePlayer(t.getOwner()).getName();
-        List<String> memberNames = resolveNames(t.getMembers());
-        List<String> allyNames = resolveTownNames(t.getAllies());
-        p.sendMessage("§e--- Town Info ---");
-        p.sendMessage("§7Name: §f" + towns.coloredTownName(t));
-        p.sendMessage("§7Owner: §f" + (ownerName != null ? ownerName : t.getOwner()));
-        p.sendMessage("§7Description: §f" + t.getDescription());
-        p.sendMessage("§7Color: §f" + t.getColorName());
-        p.sendMessage("§7Chunks claimed: §f" + t.claimCount());
-        p.sendMessage("§7Members: §f" + (memberNames.isEmpty() ? "none" : String.join(", ", memberNames)));
-        p.sendMessage("§7Allies: §f" + (allyNames.isEmpty() ? "none" : String.join(", ", allyNames)));
-        p.sendMessage("§7Town age: §f" + towns.formatTownAge(t));
-        p.sendMessage("§7Reputation: " + towns.formatReputation(t));
+        sendTownInfo(p, tOpt.get());
         return true;
     }
 
@@ -415,6 +403,60 @@ public class CommandHandler implements CommandExecutor {
         p.sendMessage("§7Claims held: §f" + claimed);
         p.sendMessage("§7Effective limit (never lowers below claims): §f" + limit);
         p.sendMessage("§7Outposts (separate clusters): §f" + currentOutposts + " §7/ §f" + allowedOutposts + " §8(first claim exempt; new isolated clusters blocked when over the cap; expansions allowed)");
+        return true;
+    }
+
+    private boolean transferOutpost(Player p, String[] args) {
+        if (!p.hasPermission("visclaims.transferoutpost")) {
+            p.sendMessage("§cNo permission.");
+            return true;
+        }
+        if (args.length < 1) {
+            p.sendMessage("Usage: /transferoutpost <town>");
+            return true;
+        }
+        ChunkPos pos = ChunkPos.of(p.getLocation().getChunk());
+        Optional<Town> fromOpt = towns.getTownAt(p.getLocation().getChunk());
+        if (fromOpt.isEmpty()) {
+            p.sendMessage("§cThis chunk is not claimed.");
+            return true;
+        }
+        Town from = fromOpt.get();
+        boolean isAdmin = p.hasPermission("visclaims.admin");
+        if (!isAdmin && !from.getOwner().equals(p.getUniqueId())) {
+            p.sendMessage("§cOnly the town owner can transfer outposts.");
+            return true;
+        }
+        if (towns.isChunkContested(pos)) {
+            p.sendMessage("§cYou cannot transfer contested chunks.");
+            return true;
+        }
+        String targetName = String.join(" ", args).trim();
+        Optional<Town> toOpt = towns.findTown(targetName);
+        if (toOpt.isEmpty()) {
+            p.sendMessage("§cTown not found: §f" + targetName);
+            return true;
+        }
+        Town to = toOpt.get();
+        if (from.getOwner().equals(to.getOwner())) {
+            p.sendMessage("§cThat town already owns this outpost.");
+            return true;
+        }
+        Set<ChunkPos> cluster = towns.getClaimCluster(from, pos);
+        if (cluster.isEmpty()) {
+            p.sendMessage("§cUnable to locate the outpost cluster.");
+            return true;
+        }
+        boolean ok = towns.transferOutpost(from, to, cluster);
+        if (!ok) {
+            p.sendMessage("§cUnable to transfer this outpost.");
+            return true;
+        }
+        p.sendMessage("§aTransferred §e" + cluster.size() + "§a chunks to §e" + towns.coloredTownName(to) + "§a.");
+        Player targetOwner = plugin.getServer().getPlayer(to.getOwner());
+        if (targetOwner != null) {
+            targetOwner.sendMessage("§e" + towns.coloredTownName(from) + " §7transferred an outpost (" + cluster.size() + " chunks) to your town.");
+        }
         return true;
     }
 
@@ -491,7 +533,6 @@ public class CommandHandler implements CommandExecutor {
         p.sendMessage("§f/claimalerts §7- Toggle your own entering/leaving messages");
         p.sendMessage("§f/silentvisit §7- Toggle silent entries into other towns (permission)");
         p.sendMessage("§f/leaderboard [toggle] §7- View leaderboard or toggle the sidebar");
-        p.sendMessage("§f/claimreload §7- Admin: reload VisualClaims config/data");
         p.sendMessage("§f/settownname <name> §7- Rename your town");
         p.sendMessage("§f/settowncolor <color> §7- Change your town's color");
         p.sendMessage("§f/settowndesc <text> §7- Set your town description");
@@ -499,11 +540,11 @@ public class CommandHandler implements CommandExecutor {
         p.sendMessage("§f/jointown <town> §7- Accept a town invite");
         p.sendMessage("§f/townmembers §7- List members in your town");
         p.sendMessage("§f/removemember <player> §7- Remove a member from your town");
+        p.sendMessage("§f/transferoutpost <town> §7- Transfer the current outpost to another town (owner only)");
         p.sendMessage("§f/towns §7- Public town listing");
-        p.sendMessage("§f/towninfo <town> §7- Public town details");
+        p.sendMessage("§f/towninfo [town] §7- View town details (defaults to yours)");
         p.sendMessage("§f/claimhistory §7- Show history for the current chunk");
         p.sendMessage("§f/alliance <town>|accept <town>|remove <town> §7- Manage alliances");
-        p.sendMessage("§f/claiminfo §7- Show info about your town");
         p.sendMessage("§f/claimlimit [player] §7- Show playtime-based claim limits");
         p.sendMessage("§f/claim help §7- Show this help message");
         if (p.hasPermission("visclaims.adminhelp")) {
@@ -668,28 +709,38 @@ public class CommandHandler implements CommandExecutor {
             p.sendMessage("§cNo permission.");
             return true;
         }
+        Optional<Town> tOpt;
         if (args.length < 1) {
-            p.sendMessage("Usage: /towninfo <town or owner>");
-            return true;
+            tOpt = towns.getTownOf(p.getUniqueId());
+            if (tOpt.isEmpty()) {
+                p.sendMessage("§cYou are not in a town.");
+                p.sendMessage("Usage: /towninfo <town or owner>");
+                return true;
+            }
+        } else {
+            tOpt = towns.findTown(String.join(" ", args));
         }
-        Optional<Town> tOpt = towns.findTown(String.join(" ", args));
         if (tOpt.isEmpty()) {
             p.sendMessage("§cNo matching town found.");
             return true;
         }
-        Town t = tOpt.get();
+        sendTownInfo(p, tOpt.get());
+        return true;
+    }
+
+    private void sendTownInfo(Player p, Town t) {
         String ownerName = plugin.getServer().getOfflinePlayer(t.getOwner()).getName();
         List<String> members = resolveNames(t.getMembers());
         List<String> allies = resolveTownNames(t.getAllies());
         p.sendMessage("§e--- Town " + towns.coloredTownName(t) + "§e ---");
         p.sendMessage("§7Owner: §f" + (ownerName != null ? ownerName : t.getOwner()));
         p.sendMessage("§7Description: §f" + t.getDescription());
+        p.sendMessage("§7Color: §f" + t.getColorName());
+        p.sendMessage("§7Chunks claimed: §f" + t.claimCount());
         p.sendMessage("§7Members: §f" + (members.isEmpty() ? "none" : String.join(", ", members)));
         p.sendMessage("§7Allies: §f" + (allies.isEmpty() ? "none" : String.join(", ", allies)));
-        p.sendMessage("§7Claims: §f" + t.claimCount());
         p.sendMessage("§7Town age: §f" + towns.formatTownAge(t));
         p.sendMessage("§7Reputation: " + towns.formatReputation(t));
-        return true;
     }
 
     private boolean claimHistory(Player p) {
@@ -855,6 +906,7 @@ public class CommandHandler implements CommandExecutor {
             p.sendMessage("§7- Leaving the outpost removes the hold-win option.");
             p.sendMessage("§7- Holding costs an extra set of claims equal to your original cost.");
             p.sendMessage("§7- If the timer ends without a win, land reverts and is immune for 7 days.");
+            p.sendMessage("§7- Contests auto-expire after 7 days with no refund.");
             p.sendMessage("§7- Use §e/contest cancel§7 to forfeit your contest (no refund).");
             p.sendMessage("§fRock Paper Scissors:");
             p.sendMessage("§7- Both owners must be online.");
@@ -1029,6 +1081,7 @@ public class CommandHandler implements CommandExecutor {
             return true;
         }
         p.sendMessage("§c--- Admin Claim Commands ---");
+        p.sendMessage("§f/claimreload §7- Reload VisualClaims config and data");
         p.sendMessage("§f/adjustclaims <player> <add|remove> <amount> §7- Modify bonus claims");
         p.sendMessage("§f/admindeletetown <town> §7- Delete a town by name/owner");
         p.sendMessage("§f/unclaim (with visclaims.admin) §7- Force unclaim any chunk");

@@ -82,16 +82,16 @@ line-weight: 2
 | `/settownname <name>` | Rename your town. | `visclaims.setname` | true |
 | `/settowncolor <color>` | Change the town colour (see list below). | `visclaims.setcolor` | true |
 | `/settowndesc <text>` | Set your town description. | `visclaims.setdesc` | true |
-| `/claiminfo` | Display your town's stats, members, and allies. | `visclaims.claiminfo` | true |
 | `/claimlimit [player]` | Show the current claim limit, playtime hours, and bonuses. Admins can target others. | `visclaims.claimlimit` | true |
 | `/claimhistory` | Show recent claim history for the current chunk. | `visclaims.history` | true |
 | `/contest` | Show contest rules, cancel a contest, or play Rock Paper Scissors. | `visclaims.contest` | true |
+| `/transferoutpost <town>` | Transfer the current outpost to another town for free (owner only). | `visclaims.transferoutpost` | true |
 | `/towninvite <player>` | Invite a player to your town. | `visclaims.invite` | true |
 | `/jointown <town>` | Accept a town invitation. | `visclaims.join` | true |
 | `/townmembers` | List members in your town (owner only). | `visclaims.members` | true |
 | `/removemember <player>` | Remove a member from your town (owner only). | `visclaims.kick` | true |
 | `/towns` | Public list of all towns, descriptions, and members. | `visclaims.towns` | true |
-| `/towninfo <town>` | Public details for a specific town. | `visclaims.towninfo` | true |
+| `/towninfo [town]` | Public details for a specific town (or your own if omitted). | `visclaims.towninfo` | true |
 | `/alliance <town>|accept <town>|remove <town>` | Manage alliances. | `visclaims.alliance` | true |
 | `/claim` | Show the quick reference help. | `visclaims.help` | true |
 | `/claim admin` | Show admin-only claim commands. | `visclaims.adminhelp` | op |
@@ -136,10 +136,11 @@ Playtime scaling reads the built-in `Statistic.PLAY_ONE_MINUTE` (same counter us
 - Use `/claimalerts` to mute your personal enter/leave messages. Staff (or anyone with `visclaims.silentvisit`) can toggle `/silentvisit` to avoid alerting other towns when passing through their land.
 - `/leaderboard` (alias `/lb`) shows the top 3 towns by kills, then claims, plus your own kills/deaths/claims. Add `toggle` to enable a persistent sidebar.
 - Claiming another town’s chunk prompts a 1-hour outpost contest that only ticks down while both owners are online. The challenger must spend claims scaled by outpost size and reputation; this cost is permanent and never refunded. Use `/contest cancel` to forfeit without a refund.
+- Contests auto-expire after 7 days with no refund, even if the timer hasn’t fully ticked down.
 - Only one contest can be active per outpost at a time. Contested chunks turn gray on Dynmap, and the contest can be won by owner kill, full-time occupation (double cost; leaving the outpost cancels the hold win), or Rock Paper Scissors. If no win occurs, the land reverts and becomes immune from contesting for 7 days.
 - Active contests show a global bossbar with the two towns; it pauses whenever one owner is offline.
 - Towns must be at least 1 day old to start or receive a contest, and contest costs scale with outpost size and the challenger’s reputation.
-- Reputation starts at green (`++`) and drops as you start contests. It’s shown with colored +/- symbols in `/claiminfo`, `/towninfo`, and the leaderboard (green = peaceful, dark red = war-hungry). Starting contests lowers reputation and increases future contest costs.
+- Reputation starts at green (`++`) and drops as you start contests. It’s shown with colored +/- symbols in `/towninfo` and the leaderboard (green = peaceful, dark red = war-hungry). Starting contests lowers reputation and increases future contest costs.
 - Outposts (non-contiguous claim clusters) follow a diminishing log curve: they start around 3 outposts near 512 claims and grow slowly as your claim cap rises. Your first claim is exempt, expansions of existing clusters are fine, and admins (`visclaims.admin`) bypass the cap. Existing outposts stay; the cap applies to creating new isolated clusters.
 - If you exceed your outpost cap, no new claims are allowed (including expansions) until you unclaim enough chunks to get back to or under your cap. `/claimlimit` shows your current/allowed outposts. `/autounclaim` can help shed land quickly.
 - `/trimoutposts <player> [count]` lets admins remove the smallest outpost clusters for a player if manual cleanup is needed.

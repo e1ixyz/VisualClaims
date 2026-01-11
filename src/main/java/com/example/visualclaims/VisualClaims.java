@@ -45,6 +45,7 @@ public class VisualClaims extends JavaPlugin {
         getCommand("claim").setExecutor(handler);         // ✅ Added (claim help)
         getCommand("claimlimit").setExecutor(handler);    // Experimental limit/info
         getCommand("adjustclaims").setExecutor(handler);  // Admin bonus adjustments
+        getCommand("transferoutpost").setExecutor(handler);
         getCommand("towninvite").setExecutor(handler);
         getCommand("jointown").setExecutor(handler);
         getCommand("townmembers").setExecutor(handler);
