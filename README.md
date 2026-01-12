@@ -9,7 +9,7 @@ VisualClaims is a Paper/Spigot plugin that lets players found towns, invite frie
 - Public town listings show descriptions, members, alliances, and claim counts.
 - Chunk history keeps a log of who claimed a spot and what alliances were active at the time.
 - Town leaderboard shows top claims/kills by default and switches to the contest view when land is contested, including RPS outcomes.
-- Contest enemy outposts for 1 hour (only while both owners are online); the first town owner kill decides who keeps the cluster, or hold the land for the full timer to win at double cost.
+- Contest enemy outposts for 1 hour; the timer ticks while both owners are online, and if both were online at the start, the hold timer keeps ticking even if the defender logs off.
 - Territory entry notifications alert town members/owners when someone enters their land.
 - Store towns as JSON on disk for safe restarts and easy editing.
 - Simple permission scheme with an admin bypass for moderators and test servers.
@@ -135,10 +135,10 @@ Playtime scaling reads the built-in `Statistic.PLAY_ONE_MINUTE` (same counter us
 - Movement messages fire whenever you cross chunk boundaries—whether you walk or teleport—so players always know when they enter or leave a town.
 - Use `/claimalerts` to mute your personal enter/leave messages. Staff (or anyone with `visclaims.silentvisit`) can toggle `/silentvisit` to avoid alerting other towns when passing through their land.
 - `/leaderboard` (alias `/lb`) shows the top 3 towns by kills, then claims, plus your own kills/deaths/claims. Add `toggle` to enable a persistent sidebar.
-- Claiming another town’s chunk prompts a 1-hour outpost contest that only ticks down while both owners are online. The challenger must spend claims scaled by outpost size and reputation; this cost is permanent and never refunded. Use `/contest cancel` to forfeit without a refund.
+- Claiming another town’s chunk prompts a 1-hour outpost contest. The timer ticks while both owners are online; if both were online when the contest started, the hold timer continues even if the defender logs off. The challenger must spend claims scaled by outpost size and reputation; this cost is permanent and never refunded. Use `/contest cancel` to forfeit without a refund.
 - Contests auto-expire after 7 days with no refund, even if the timer hasn’t fully ticked down.
 - Only one contest can be active per outpost at a time. Contested chunks turn gray on Dynmap, and the contest can be won by owner kill, full-time occupation (double cost; leaving the outpost cancels the hold win), or Rock Paper Scissors. If no win occurs, the land reverts and becomes immune from contesting for 7 days.
-- Active contests show a global bossbar with the two towns; it pauses whenever one owner is offline.
+- Active contests show a global bossbar while the challenger is holding the outpost; it hides if they leave the contested land or hold is disabled.
 - Towns must be at least 1 day old to start or receive a contest, and contest costs scale with outpost size and the challenger’s reputation.
 - Reputation starts at green (`++`) and drops as you start contests. It’s shown with colored +/- symbols in `/towninfo` and the leaderboard (green = peaceful, dark red = war-hungry). Starting contests lowers reputation and increases future contest costs.
 - Outposts (non-contiguous claim clusters) follow a diminishing log curve: they start around 3 outposts near 512 claims and grow slowly as your claim cap rises. Your first claim is exempt, expansions of existing clusters are fine, and admins (`visclaims.admin`) bypass the cap. Existing outposts stay; the cap applies to creating new isolated clusters.

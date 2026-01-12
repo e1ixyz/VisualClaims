@@ -24,6 +24,7 @@ public class Town {
     private int kills = 0; // tracked town kills
     private long createdAt = 0L;
     private int reputation = MAX_REPUTATION;
+    private boolean reputationInitialized = false;
 
     // For Gson
     public Town() {}
@@ -35,6 +36,7 @@ public class Town {
         this.colorName = colorName;
         this.createdAt = System.currentTimeMillis();
         this.reputation = MAX_REPUTATION;
+        this.reputationInitialized = true;
     }
 
     public UUID getOwner() { return owner; }
@@ -83,6 +85,8 @@ public class Town {
 
     public int getReputation() { return reputation; }
     public void setReputation(int reputation) { this.reputation = reputation; }
+    public boolean isReputationInitialized() { return reputationInitialized; }
+    public void setReputationInitialized(boolean reputationInitialized) { this.reputationInitialized = reputationInitialized; }
     public void addReputation(int delta) {
         int next = this.reputation + delta;
         if (next > MAX_REPUTATION) next = MAX_REPUTATION;

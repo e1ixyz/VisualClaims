@@ -15,6 +15,7 @@ public class ContestState {
     private long lastUpdated;
     private boolean paused;
     private boolean holdEligible = true;
+    private boolean holdOfflineAllowed = false;
     private int startCost;
 
     public ContestState() {}
@@ -46,6 +47,8 @@ public class ContestState {
     public void setPaused(boolean paused) { this.paused = paused; }
     public boolean isHoldEligible() { return holdEligible; }
     public void setHoldEligible(boolean holdEligible) { this.holdEligible = holdEligible; }
+    public boolean isHoldOfflineAllowed() { return holdOfflineAllowed; }
+    public void setHoldOfflineAllowed(boolean holdOfflineAllowed) { this.holdOfflineAllowed = holdOfflineAllowed; }
     public int getStartCost() { return startCost; }
     public void setStartCost(int startCost) { this.startCost = startCost; }
 

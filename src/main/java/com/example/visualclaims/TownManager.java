@@ -439,6 +439,25 @@ public class TownManager {
         return theoretical - t.claimCount();
     }
 
+    private void notifyDebtCrossing(Town town, int availableBefore, int availableAfter) {
+        if (town == null) return;
+        if (availableBefore >= 0 && availableAfter < 0) {
+            int debt = Math.max(1, -availableAfter);
+            Player p = Bukkit.getPlayer(town.getOwner());
+            if (p == null) return;
+            p.sendMessage("§cYou are now in claim debt: §e" + debt + "§c chunks over your limit.");
+            p.sendMessage("§cYou cannot claim more chunks until you are out of debt.");
+            boolean scaling = plugin.getConfig().getBoolean("use-playtime-scaling", false);
+            int chunksPerHour = Math.max(1, plugin.getConfig().getInt("chunks-per-hour", 2));
+            if (scaling) {
+                int hoursNeeded = (int) Math.ceil(debt / (double) chunksPerHour);
+                p.sendMessage("§7Recover by unclaiming §e" + debt + "§7 chunks or playing about §e" + hoursNeeded + "h §7(@" + chunksPerHour + " chunks/hour).");
+            } else {
+                p.sendMessage("§7Recover by unclaiming §e" + debt + "§7 chunks.");
+            }
+        }
+    }
+
     public boolean isAdjacentToOwnClaim(Town town, ChunkPos pos) {
         if (town == null || town.getClaims() == null || town.getClaims().isEmpty()) return false;
         int x = pos.getX();
@@ -699,6 +718,24 @@ public class TownManager {
         pendingContestConfirmations.remove(player);
     }
 
+    private void pruneExpiredPendingContests() {
+        long now = System.currentTimeMillis();
+        Iterator<Map.Entry<UUID, PendingContest>> it = pendingContestConfirmations.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<UUID, PendingContest> entry = it.next();
+            PendingContest pending = entry.getValue();
+            if (pending == null || pending.isExpired(now, PENDING_CONTEST_TTL_MS)) {
+                it.remove();
+                Player p = Bukkit.getPlayer(entry.getKey());
+                if (p != null) {
+                    Town defender = townsByOwner.get(pending != null ? pending.getDefenderOwner() : null);
+                    String label = defender != null ? coloredTownName(defender) : "that outpost";
+                    p.sendMessage("§cContest confirmation expired for §e" + label + "§c. Run §e/claimchunk§c again to contest.");
+                }
+            }
+        }
+    }
+
     public boolean startContest(Town challenger, Town defender, Set<ChunkPos> cluster, int cost) {
         if (challenger == null || defender == null || cluster.isEmpty()) return false;
         for (ChunkPos pos : cluster) {
@@ -710,12 +747,17 @@ public class TownManager {
         ContestState contest = new ContestState(defender.getOwner(), challenger.getOwner(), cluster, now, now + CONTEST_DURATION_MS);
         contest.setStartCost(Math.max(1, cost));
         contest.setHoldEligible(true);
-        contest.setPaused(!(isOwnerOnline(defender.getOwner()) && isOwnerOnline(challenger.getOwner())));
+        boolean bothOnline = isOwnerOnline(defender.getOwner()) && isOwnerOnline(challenger.getOwner());
+        contest.setHoldOfflineAllowed(bothOnline);
+        contest.setPaused(!bothOnline);
         contestsById.put(contest.getId(), contest);
         indexContest(contest);
+        int availableBefore = computeAvailableClaims(challenger.getOwner());
         challenger.addContestedClaimsSpent(Math.max(1, cost));
+        int availableAfter = computeAvailableClaims(challenger.getOwner());
         challenger.addReputation(-1);
         saveTown(challenger);
+        notifyDebtCrossing(challenger, availableBefore, availableAfter);
         saveContests();
         for (ChunkPos pos : cluster) {
             updateChunkMarker(defender, pos);
@@ -902,8 +944,9 @@ public class TownManager {
                             t.setCreatedAt(System.currentTimeMillis() - MIN_TOWN_AGE_MS);
                             changed = true;
                         }
-                        if (t.getReputation() == 0) {
+                        if (!t.isReputationInitialized()) {
                             t.setReputation(Town.MAX_REPUTATION);
+                            t.setReputationInitialized(true);
                             changed = true;
                         } else if (t.getReputation() > Town.MAX_REPUTATION) {
                             t.setReputation(Town.MAX_REPUTATION);
@@ -1027,7 +1070,12 @@ public class TownManager {
                         contest.setStartCost(Math.max(1, contest.getChunkCount()));
                         contest.setHoldEligible(true);
                     }
-                    contest.setPaused(!(isOwnerOnline(contest.getDefenderOwner()) && isOwnerOnline(contest.getChallengerOwner())));
+                    if (contest.isHoldEligible() && contest.isHoldOfflineAllowed() && contest.getStartTime() <= 0) {
+                        contest.setHoldOfflineAllowed(false);
+                    }
+                    boolean bothOnline = isOwnerOnline(contest.getDefenderOwner()) && isOwnerOnline(contest.getChallengerOwner());
+                    boolean challengerInside = isOwnerInContest(contest.getChallengerOwner(), contest);
+                    contest.setPaused(!isContestTimerTicking(contest, bothOnline, challengerInside));
                     contest.setLastUpdated(now);
                     contestsById.put(id, contest);
                     indexContest(contest);
@@ -1136,7 +1184,8 @@ public class TownManager {
 
             boolean bothOnline = isOwnerOnline(defender.getOwner()) && isOwnerOnline(challenger.getOwner());
             boolean challengerInside = isOwnerInContest(challenger.getOwner(), contest);
-            boolean pausedNow = !bothOnline;
+            boolean timerTicking = isContestTimerTicking(contest, bothOnline, challengerInside);
+            boolean pausedNow = !timerTicking;
             if (contest.isPaused() != pausedNow) {
                 contest.setPaused(pausedNow);
                 updated = true;
@@ -1154,7 +1203,7 @@ public class TownManager {
                 }
                 updated = true;
             }
-            if (bothOnline) {
+            if (timerTicking) {
                 long elapsed = Math.max(0L, now - last);
                 if (elapsed > 0) {
                     remaining = Math.max(0L, remaining - elapsed);
@@ -1271,8 +1320,11 @@ public class TownManager {
 
     private boolean shouldShowBossBar(ContestState contest) {
         if (contest == null) return false;
-        if (contest.isPaused()) return false;
-        return contest.isHoldEligible();
+        if (!contest.isHoldEligible()) return false;
+        boolean challengerInside = isOwnerInContest(contest.getChallengerOwner(), contest);
+        if (!challengerInside) return false;
+        if (contest.isHoldOfflineAllowed()) return true;
+        return isOwnerOnline(contest.getDefenderOwner()) && isOwnerOnline(contest.getChallengerOwner());
     }
 
     private void clearContestBossBar() {
@@ -1375,9 +1427,12 @@ public class TownManager {
                 recordHistory(pos, resolution == ContestResolution.HOLD ? "CONTEST-HOLD" : "CONTEST-WIN", winner);
             }
             if (resolution == ContestResolution.HOLD && challenger != null) {
+                int availableBefore = computeAvailableClaims(challenger.getOwner());
                 int extraCost = Math.max(1, contest.getStartCost());
                 challenger.addContestedClaimsSpent(extraCost);
+                int availableAfter = computeAvailableClaims(challenger.getOwner());
                 saveTown(challenger);
+                notifyDebtCrossing(challenger, availableBefore, availableAfter);
                 Player challengerPlayer = Bukkit.getPlayer(challenger.getOwner());
                 if (challengerPlayer != null) {
                     challengerPlayer.sendMessage("§cHolding the outpost cost an extra §e" + extraCost + "§c claims.");
@@ -1533,6 +1588,12 @@ public class TownManager {
             return minutes + "m" + (seconds > 0 ? seconds + "s" : "");
         }
         return Math.max(1, seconds) + "s";
+    }
+
+    private boolean isContestTimerTicking(ContestState contest, boolean bothOnline, boolean challengerInside) {
+        if (contest == null) return false;
+        boolean holdTicking = contest.isHoldEligible() && challengerInside && contest.isHoldOfflineAllowed();
+        return bothOnline || holdTicking;
     }
 
     private boolean isOwnerOnline(UUID owner) {
@@ -1792,6 +1853,7 @@ public class TownManager {
     public void startContestTicker() {
         if (contestTask != null) contestTask.cancel();
         contestTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            pruneExpiredPendingContests();
             boolean updated = updateContestTimers();
             pruneExpiredContestImmunity();
             if (!contestsById.isEmpty() || updated) {

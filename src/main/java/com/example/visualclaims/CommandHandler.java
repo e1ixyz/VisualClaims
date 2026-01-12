@@ -222,9 +222,11 @@ public class CommandHandler implements CommandExecutor {
         p.sendMessage("§eThis chunk belongs to §f" + towns.coloredTownName(defender) + "§e.");
         p.sendMessage("§eContest entire outpost of §f" + cluster.size() + "§e chunks for §f" + cost + "§e claims (scaled by size + reputation).");
         p.sendMessage("§eThis permanently deducts §f" + cost + "§e of your claims.");
+        int doubleCost = cost * 2;
         p.sendMessage("§eHolding the land for the full timer wins without a kill but costs an extra §f" + cost + "§e claims.");
+        p.sendMessage("§eTotal cost if you hold: §f" + doubleCost + "§e claims.");
         p.sendMessage("§7Leaving the outpost removes the hold-win option.");
-        p.sendMessage("§7Timer only ticks while both owners are online.");
+        p.sendMessage("§7Timer ticks while both owners are online; if both were online at start, holding keeps ticking even if the defender logs off.");
         p.sendMessage("§7Type §e/claimchunk §7again within 15 seconds to confirm.");
         return true;
     }
@@ -523,7 +525,7 @@ public class CommandHandler implements CommandExecutor {
         p.sendMessage("§f/createtown <name> §7- Create your town");
         p.sendMessage("§f/deletetown §7- Delete your town");
         p.sendMessage("§f/claimchunk §7- Claim the current chunk (or contest enemy outposts)");
-        p.sendMessage("§7Contests: 1h timer (ticks only while both owners are online); holding the land wins but costs extra claims.");
+        p.sendMessage("§7Contests: 1h timer (ticks while both owners are online; hold timer keeps ticking if both were online at start); holding wins but costs extra claims.");
         p.sendMessage("§f/contest §7- Learn about contesting land and Rock Paper Scissors");
         p.sendMessage("§f/contest cancel §7- Forfeit your active contest (no refund)");
         p.sendMessage("§f/unclaim §7- Unclaim the current chunk");
@@ -899,13 +901,14 @@ public class CommandHandler implements CommandExecutor {
             p.sendMessage("§7- Your town and the defender must both be at least 1 day old.");
             p.sendMessage("§7- The contest costs claims based on outpost size and your reputation.");
             p.sendMessage("§7- This permanently deducts those claims from your total (never refunded).");
-            p.sendMessage("§7- Timer is 1 hour and only ticks while both owners are online.");
+            p.sendMessage("§7- Timer is 1 hour.");
             p.sendMessage("§7- Only one contest can be active per outpost at a time.");
             p.sendMessage("§7- Win by: owner kill, hold the outpost for the full timer, or Rock Paper Scissors.");
             p.sendMessage("§7- Holding wins only if you stay inside the outpost the whole time.");
             p.sendMessage("§7- Leaving the outpost removes the hold-win option.");
             p.sendMessage("§7- Holding costs an extra set of claims equal to your original cost.");
             p.sendMessage("§7- If the timer ends without a win, land reverts and is immune for 7 days.");
+            p.sendMessage("§7- Timer ticks while both owners are online; if both are online when it starts, the hold timer keeps ticking even if the defender logs off.");
             p.sendMessage("§7- Contests auto-expire after 7 days with no refund.");
             p.sendMessage("§7- Use §e/contest cancel§7 to forfeit your contest (no refund).");
             p.sendMessage("§fRock Paper Scissors:");
