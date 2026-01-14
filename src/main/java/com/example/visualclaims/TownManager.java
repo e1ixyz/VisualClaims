@@ -1327,6 +1327,18 @@ public class TownManager {
         return isOwnerOnline(contest.getDefenderOwner()) && isOwnerOnline(contest.getChallengerOwner());
     }
 
+    private boolean isContestParticipant(UUID playerId) {
+        Optional<Town> townOpt = getTownOf(playerId);
+        if (townOpt.isEmpty()) return false;
+        UUID owner = townOpt.get().getOwner();
+        for (ContestState contest : contestsById.values()) {
+            if (owner.equals(contest.getDefenderOwner()) || owner.equals(contest.getChallengerOwner())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void clearContestBossBar() {
         if (contestBossBar != null) {
             contestBossBar.removeAll();
@@ -1559,7 +1571,27 @@ public class TownManager {
     }
 
     public List<String> buildContestLines() {
-        List<ContestState> contests = new ArrayList<>(contestsById.values());
+        return buildContestLines(new ArrayList<>(contestsById.values()));
+    }
+
+    public List<String> buildContestLinesForOwner(UUID owner) {
+        if (owner == null) return Collections.emptyList();
+        List<ContestState> contests = new ArrayList<>();
+        for (ContestState contest : contestsById.values()) {
+            if (owner.equals(contest.getDefenderOwner()) || owner.equals(contest.getChallengerOwner())) {
+                contests.add(contest);
+            }
+        }
+        return buildContestLines(contests);
+    }
+
+    public List<String> buildContestLinesForPlayer(UUID playerId) {
+        Optional<Town> townOpt = getTownOf(playerId);
+        if (townOpt.isEmpty()) return Collections.emptyList();
+        return buildContestLinesForOwner(townOpt.get().getOwner());
+    }
+
+    private List<String> buildContestLines(List<ContestState> contests) {
         contests.sort(Comparator.comparingLong(ContestState::getRemainingMs));
         List<String> lines = new ArrayList<>();
         for (ContestState contest : contests) {
@@ -1612,7 +1644,8 @@ public class TownManager {
     public void applyScoreboard(Player p) {
         ScoreboardManager mgr = Bukkit.getScoreboardManager();
         UUID id = p.getUniqueId();
-        if (!leaderboardDisabled.contains(id)) {
+        boolean inContest = isContestParticipant(id);
+        if (inContest || !leaderboardDisabled.contains(id)) {
             if (mgr != null && !leaderboardBoards.containsKey(id)) refreshLeaderboardScoreboard();
             Scoreboard lb = leaderboardBoards.get(id);
             if (lb != null) { p.setScoreboard(lb); return; }
@@ -1642,13 +1675,17 @@ public class TownManager {
 
         List<Town> killsTop = topByKills(3);
         List<Town> claimsTop = topByClaims(3);
-        List<String> contests = buildContestLines();
-
-        leaderboardBoards.entrySet().removeIf(e -> leaderboardDisabled.contains(e.getKey()));
 
         for (Player online : Bukkit.getOnlinePlayers()) {
             UUID viewer = online.getUniqueId();
-            if (leaderboardDisabled.contains(viewer)) continue;
+            boolean inContest = isContestParticipant(viewer);
+            boolean shouldShow = inContest || !leaderboardDisabled.contains(viewer);
+            if (!shouldShow) {
+                leaderboardBoards.remove(viewer);
+                online.setScoreboard(mgr.getMainScoreboard());
+                continue;
+            }
+            List<String> contests = inContest ? buildContestLinesForPlayer(viewer) : Collections.emptyList();
             Scoreboard board = buildLeaderboardBoard(mgr, viewer, killsTop, claimsTop, contests);
             leaderboardBoards.put(viewer, board);
             online.setScoreboard(board);

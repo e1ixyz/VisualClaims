@@ -525,7 +525,8 @@ public class CommandHandler implements CommandExecutor {
         p.sendMessage("§f/createtown <name> §7- Create your town");
         p.sendMessage("§f/deletetown §7- Delete your town");
         p.sendMessage("§f/claimchunk §7- Claim the current chunk (or contest enemy outposts)");
-        p.sendMessage("§7Contests: 1h timer (ticks while both owners are online; hold timer keeps ticking if both were online at start); holding wins but costs extra claims.");
+        p.sendMessage("§7Contests: 1h timer (ticks while both owners are online; hold keeps ticking if both were online at start).");
+        p.sendMessage("§7Contests auto-expire after 7 days (no refund). Holding wins but costs extra claims.");
         p.sendMessage("§f/contest §7- Learn about contesting land and Rock Paper Scissors");
         p.sendMessage("§f/contest cancel §7- Forfeit your active contest (no refund)");
         p.sendMessage("§f/unclaim §7- Unclaim the current chunk");
