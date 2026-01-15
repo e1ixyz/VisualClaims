@@ -42,6 +42,10 @@ commands:
     description: Set your town description
     usage: /settowndesc <text>
     permission: visclaims.setdesc
+  setcapital:
+    description: Set the current outpost as your capital (owner only)
+    usage: /setcapital
+    permission: visclaims.capital
   claiminfo:
     description: Show info about your town
     usage: /claiminfo
@@ -55,10 +59,10 @@ commands:
     usage: /claim help
     permission: visclaims.help
   leaderboard:
-    description: View town leaderboard or toggle the leaderboard scoreboard
+    description: View town leaderboard or cycle the leaderboard scoreboard
     usage: /leaderboard [toggle]
     permission: visclaims.leaderboard
-    aliases: [lb]
+    aliases: [lb, leadboard]
   claimalerts:
     description: Toggle receiving claim enter/leave messages
     usage: /claimalerts
@@ -95,6 +99,10 @@ commands:
     description: Accept a town invitation
     usage: /jointown <town>
     permission: visclaims.join
+  leavetown:
+    description: Leave your current town (members only)
+    usage: /leavetown
+    permission: visclaims.leave
   townmembers:
     description: Show members in your town
     usage: /townmembers
@@ -160,6 +168,9 @@ permissions:
   visclaims.setdesc:
     description: Allows setting your town description
     default: true
+  visclaims.capital:
+    description: Allows setting your town capital
+    default: true
   visclaims.claiminfo:
     description: Allows using /claiminfo to view your town details
     default: true
@@ -192,6 +203,9 @@ permissions:
     default: true
   visclaims.join:
     description: Allows accepting a town invitation
+    default: true
+  visclaims.leave:
+    description: Allows leaving your current town
     default: true
   visclaims.members:
     description: Allows viewing members in your town

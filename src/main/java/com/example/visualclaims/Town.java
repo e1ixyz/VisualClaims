@@ -19,6 +19,7 @@ public class Town {
     private String description = "";
     private Set<UUID> allies = new HashSet<>();
     private Set<UUID> wars = new HashSet<>();
+    private Set<ChunkPos> capitalClaims = new HashSet<>();
     private int bonusChunks = 0; // manual adjustments
     private int contestedClaimsSpent = 0; // spent claims on contests
     private int kills = 0; // tracked town kills
@@ -59,6 +60,19 @@ public class Town {
     public Set<UUID> getMembers() { return members; }
     public Set<UUID> getAllies() { return allies; }
     public Set<UUID> getWars() { return wars; }
+    public Set<ChunkPos> getCapitalClaims() {
+        if (capitalClaims == null) capitalClaims = new HashSet<>();
+        return capitalClaims;
+    }
+    public void setCapitalClaims(Set<ChunkPos> capitalClaims) {
+        this.capitalClaims = capitalClaims == null ? new HashSet<>() : new HashSet<>(capitalClaims);
+    }
+    public void clearCapitalClaims() { getCapitalClaims().clear(); }
+    public boolean isCapitalChunk(ChunkPos pos) { return pos != null && getCapitalClaims().contains(pos); }
+    public void removeCapitalClaim(ChunkPos pos) {
+        if (pos == null || capitalClaims == null) return;
+        capitalClaims.remove(pos);
+    }
 
     public boolean addClaim(ChunkPos pos) { return claims.add(pos); }
     public boolean removeClaim(ChunkPos pos) { return claims.remove(pos); }

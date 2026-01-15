@@ -124,7 +124,14 @@ public class MoveListener implements Listener {
         boolean showMessages = shouldShowChunkMessages(uuid);
 
         String contestLabel = townManager.getContestLabel(pos, uuid);
-        String currentLabel = contestLabel != null ? contestLabel : (currentTown != null ? townManager.coloredTownName(currentTown) : null);
+        String currentLabel;
+        if (contestLabel != null) {
+            currentLabel = contestLabel;
+        } else if (currentTown != null && townManager.isCapitalChunk(currentTown, pos)) {
+            currentLabel = townManager.capitalLabel(currentTown);
+        } else {
+            currentLabel = currentTown != null ? townManager.coloredTownName(currentTown) : null;
+        }
         String prevLabel = lastAreaLabel.get(uuid);
 
         if (!Objects.equals(prevLabel, currentLabel)) {

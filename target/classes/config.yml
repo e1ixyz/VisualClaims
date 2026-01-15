@@ -19,12 +19,15 @@ scoreboard:
   top-kills-title: "&bTop Kills"
   top-claims-title: "&eTop Claims"
   contested-title: "&cContested Chunks"
+  alliances-title: "&dAlliances"
   you-title: "&aYou"
   none: "&7None"
   separator: "&7----------------"
   hide-tip: "&7Hide this with &e/lb toggle"
   # Placeholders: {index} {town} {value}
   top-entry-format: "&f{index}. {town} &7({value})"
+  # Placeholders: {index} {alliance}
+  alliance-entry-format: "&f{index}. {alliance}"
   # Placeholders: {value}
   you-kills-format: "&fKills: &e{value}"
   you-deaths-format: "&fDeaths: &e{value}"

@@ -63,12 +63,15 @@ scoreboard:
   top-kills-title: "&bTop Kills"
   top-claims-title: "&eTop Claims"
   contested-title: "&cContested Chunks"
+  alliances-title: "&dAlliances"
   you-title: "&aYou"
   none: "&7None"
   separator: "&7----------------"
   hide-tip: "&7Hide this with &e/lb toggle"
   # Placeholders: {index} {town} {value}
   top-entry-format: "&f{index}. {town} &7({value})"
+  # Placeholders: {index} {alliance}
+  alliance-entry-format: "&f{index}. {alliance}"
   # Placeholders: {value}
   you-kills-format: "&fKills: &e{value}"
   you-deaths-format: "&fDeaths: &e{value}"
@@ -83,7 +86,7 @@ scoreboard:
 - `chunks-per-hour`: Chunk allowance per played hour when playtime scaling is enabled.
 - `default-color`: Applied to newly created towns; value must match a vanilla chat colour name.
 - Marker style keys tweak the appearance of the Dynmap polygons.
-- `scoreboard.*`: Customize the sidebar text/colors with `&` codes. `top-entry-format` uses `{index}`, `{town}`, `{value}`; `contest-entry-format` uses `{index}`, `{defender}`, `{challenger}`, `{chunks}`, `{time}`, `{paused}`.
+- `scoreboard.*`: Customize the sidebar text/colors with `&` codes. `top-entry-format` uses `{index}`, `{town}`, `{value}`; `alliance-entry-format` uses `{index}`, `{alliance}`; `contest-entry-format` uses `{index}`, `{defender}`, `{challenger}`, `{chunks}`, `{time}`, `{paused}`.
 - Restart the server (or reload VisualClaims) after editing the config to apply changes.
 
 ## Commands & Permissions
@@ -96,19 +99,21 @@ scoreboard:
 | `/autoclaim` | Toggle automatic claiming while you walk. | `visclaims.autoclaim` | true |
 | `/autounclaim` | Toggle automatic unclaiming of owned chunks as you walk. | `visclaims.autounclaim` | true |
 | `/autohistory` | Toggle automatic chunk history popups while you walk. | `visclaims.autohistory` | true |
-| `/leaderboard [toggle]` | Show top towns by claims/kills in chat or toggle the sidebar leaderboard. | `visclaims.leaderboard` | true |
+| `/leaderboard [toggle]` | Show top towns by claims/kills in chat or cycle the sidebar (off/leaderboard/alliances). | `visclaims.leaderboard` | true |
 | `/claimalerts` | Toggle the chat messages when you enter or leave claimed chunks. | `visclaims.claimalerts` | true |
 | `/silentvisit` | Toggle silently entering other players' towns (no alerts sent to them). | `visclaims.silentvisit` | op |
 | `/claimreload` | Admin: reload VisualClaims config and data. | `visclaims.admin` | op |
 | `/settownname <name>` | Rename your town. | `visclaims.setname` | true |
 | `/settowncolor <color>` | Change the town colour (see list below). | `visclaims.setcolor` | true |
 | `/settowndesc <text>` | Set your town description. | `visclaims.setdesc` | true |
+| `/setcapital` | Set the current outpost as your town capital (owner only). | `visclaims.capital` | true |
 | `/claimlimit [player]` | Show the current claim limit, playtime hours, and bonuses. Admins can target others. | `visclaims.claimlimit` | true |
 | `/claimhistory` | Show recent claim history for the current chunk. | `visclaims.history` | true |
 | `/contest` | Show contest rules, cancel a contest, or play Rock Paper Scissors. | `visclaims.contest` | true |
 | `/transferoutpost <town>` | Transfer the current outpost to another town for free (owner only). | `visclaims.transferoutpost` | true |
 | `/towninvite <player>` | Invite a player to your town. | `visclaims.invite` | true |
 | `/jointown <town>` | Accept a town invitation. | `visclaims.join` | true |
+| `/leavetown` | Leave your current town (members only). | `visclaims.leave` | true |
 | `/townmembers` | List members in your town (owner only). | `visclaims.members` | true |
 | `/removemember <player>` | Remove a member from your town (owner only). | `visclaims.kick` | true |
 | `/towns` | Public list of all towns, descriptions, and members. | `visclaims.towns` | true |
@@ -155,7 +160,8 @@ Playtime scaling reads the built-in `Statistic.PLAY_ONE_MINUTE` (same counter us
 - Autoclaim only works if you already own a town and are inside unclaimed territory. You will receive feedback if you hit the chunk cap or collide with another town's claim.
 - Movement messages fire whenever you cross chunk boundaries—whether you walk or teleport—so players always know when they enter or leave a town.
 - Use `/claimalerts` to mute your personal enter/leave messages. Staff (or anyone with `visclaims.silentvisit`) can toggle `/silentvisit` to avoid alerting other towns when passing through their land.
-- `/leaderboard` (alias `/lb`) shows the top 3 towns by kills, then claims, plus your own kills/deaths/claims. Add `toggle` to enable a persistent sidebar.
+- `/leaderboard` (aliases `/lb`, `/leadboard`) shows the top 3 towns by kills, then claims, plus your own kills/deaths/claims. Add `toggle` to cycle the sidebar (off/leaderboard/alliances).
+- Use `/setcapital` to mark the current outpost as your capital. Capital chunks display `Capital: <town>` and contesting a capital costs 3x (and doubles again if won by holding).
 - Claiming another town’s chunk prompts a 1-hour outpost contest. The timer ticks while both owners are online; if both were online when the contest started, the hold timer continues even if the defender logs off. The challenger must spend claims scaled by outpost size and reputation; this cost is permanent and never refunded. Use `/contest cancel` to forfeit without a refund.
 - Contests auto-expire after 7 days with no refund, even if the timer hasn’t fully ticked down.
 - Only one contest can be active per outpost at a time. Contested chunks turn gray on Dynmap, and the contest can be won by owner kill, full-time occupation (double cost; leaving the outpost cancels the hold win), or Rock Paper Scissors. If no win occurs, the land reverts and becomes immune from contesting for 7 days.

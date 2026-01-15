@@ -40,6 +40,7 @@ public class VisualClaims extends JavaPlugin {
         getCommand("settownname").setExecutor(handler);
         getCommand("settowncolor").setExecutor(handler);
         getCommand("settowndesc").setExecutor(handler);
+        getCommand("setcapital").setExecutor(handler);
         getCommand("claiminfo").setExecutor(handler);     // ✅ Added
         getCommand("claimhistory").setExecutor(handler);
         getCommand("claim").setExecutor(handler);         // ✅ Added (claim help)
@@ -48,6 +49,7 @@ public class VisualClaims extends JavaPlugin {
         getCommand("transferoutpost").setExecutor(handler);
         getCommand("towninvite").setExecutor(handler);
         getCommand("jointown").setExecutor(handler);
+        getCommand("leavetown").setExecutor(handler);
         getCommand("townmembers").setExecutor(handler);
         getCommand("removemember").setExecutor(handler);
         getCommand("towns").setExecutor(handler);
