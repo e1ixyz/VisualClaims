@@ -93,6 +93,20 @@ public class TownManager {
     private final Map<String, PendingRps> pendingRpsByContest = new HashMap<>();
 
     private final Map<UUID, Scoreboard> leaderboardBoards = new HashMap<>();
+    private String scoreboardTitle;
+    private String scoreboardTopKillsTitle;
+    private String scoreboardTopClaimsTitle;
+    private String scoreboardContestedTitle;
+    private String scoreboardYouTitle;
+    private String scoreboardNoneLine;
+    private String scoreboardSeparatorLine;
+    private String scoreboardHideTip;
+    private String scoreboardTopEntryFormat;
+    private String scoreboardYouKillsFormat;
+    private String scoreboardYouDeathsFormat;
+    private String scoreboardYouClaimsFormat;
+    private String scoreboardContestEntryFormat;
+    private String scoreboardContestPausedText;
     private BukkitTask contestTask;
     private BossBar contestBossBar;
 
@@ -107,6 +121,35 @@ public class TownManager {
         this.contestsFile = new File(plugin.getDataFolder(), "contests.json");
         this.contestImmunityFile = new File(plugin.getDataFolder(), "contest-immunity.json");
         this.gson = new GsonBuilder().setPrettyPrinting().create();
+    }
+
+    private void loadScoreboardSettings() {
+        scoreboardTitle = colorize(plugin.getConfig().getString("scoreboard.title", "&6&lLeaderboard"));
+        scoreboardTopKillsTitle = colorize(plugin.getConfig().getString("scoreboard.top-kills-title", "&bTop Kills"));
+        scoreboardTopClaimsTitle = colorize(plugin.getConfig().getString("scoreboard.top-claims-title", "&eTop Claims"));
+        scoreboardContestedTitle = colorize(plugin.getConfig().getString("scoreboard.contested-title", "&cContested Chunks"));
+        scoreboardYouTitle = colorize(plugin.getConfig().getString("scoreboard.you-title", "&aYou"));
+        scoreboardNoneLine = colorize(plugin.getConfig().getString("scoreboard.none", "&7None"));
+        scoreboardSeparatorLine = colorize(plugin.getConfig().getString("scoreboard.separator", "&7----------------"));
+        scoreboardHideTip = colorize(plugin.getConfig().getString("scoreboard.hide-tip", "&7Hide this with &e/lb toggle"));
+        scoreboardTopEntryFormat = plugin.getConfig().getString("scoreboard.top-entry-format", "&f{index}. {town} &7({value})");
+        scoreboardYouKillsFormat = plugin.getConfig().getString("scoreboard.you-kills-format", "&fKills: &e{value}");
+        scoreboardYouDeathsFormat = plugin.getConfig().getString("scoreboard.you-deaths-format", "&fDeaths: &e{value}");
+        scoreboardYouClaimsFormat = plugin.getConfig().getString("scoreboard.you-claims-format", "&fClaims: &e{value}");
+        scoreboardContestEntryFormat = plugin.getConfig().getString("scoreboard.contest-entry-format", "&f{index}. {defender} &7vs {challenger} &7({chunks}) &e{time}{paused}");
+        scoreboardContestPausedText = plugin.getConfig().getString("scoreboard.contest-paused-text", "&c paused");
+    }
+
+    private String colorize(String input) {
+        return ChatColor.translateAlternateColorCodes('&', input == null ? "" : input);
+    }
+
+    private String formatTemplate(String template, String... pairs) {
+        String out = template == null ? "" : template;
+        for (int i = 0; i + 1 < pairs.length; i += 2) {
+            out = out.replace("{" + pairs[i] + "}", pairs[i + 1] == null ? "" : pairs[i + 1]);
+        }
+        return colorize(out);
     }
 
     public Optional<Town> getTownByOwner(UUID owner) { return Optional.ofNullable(townsByOwner.get(owner)); }
@@ -670,7 +713,15 @@ public class TownManager {
     public String getContestLabel(ChunkPos pos) {
         if (pos == null) return null;
         ContestState contest = contestsByChunkId.get(pos.id());
-        return contest != null ? buildContestLabel(contest) : null;
+        return contest != null ? buildContestLabelPlain(contest) : null;
+    }
+
+    public String getContestLabel(ChunkPos pos, UUID viewer) {
+        if (pos == null) return null;
+        ContestState contest = contestsByChunkId.get(pos.id());
+        if (contest == null) return null;
+        Town viewerTown = viewer == null ? null : getTownOf(viewer).orElse(null);
+        return buildContestLabelForViewer(contest, viewerTown);
     }
 
     public List<ContestState> getContestsForOwner(UUID owner) {
@@ -930,6 +981,7 @@ public class TownManager {
     }
 
     public void loadAll() {
+        loadScoreboardSettings();
         townsByOwner.clear();
         townsByChunkId.clear();
         townsByMember.clear();
@@ -1480,7 +1532,7 @@ public class TownManager {
         if (dynmap == null || pos == null) return;
         ContestState contest = contestsByChunkId.get(pos.id());
         if (contest != null) {
-            String label = buildContestLabel(contest);
+            String label = buildContestLabelPlain(contest);
             dynmap.addOrUpdateChunkArea(label, VanillaColor.GRAY.rgb, pos);
         } else if (owner != null) {
             dynmap.addOrUpdateChunkArea(owner, pos);
@@ -1489,10 +1541,26 @@ public class TownManager {
         }
     }
 
-    private String buildContestLabel(ContestState contest) {
+    private String buildContestLabelPlain(ContestState contest) {
         String defender = plainTownName(contest.getDefenderOwner());
         String challenger = plainTownName(contest.getChallengerOwner());
         return "Contested: " + defender + " vs " + challenger;
+    }
+
+    private String buildContestLabelForViewer(ContestState contest, Town viewerTown) {
+        String defender = contestTownLabel(contest.getDefenderOwner(), viewerTown);
+        String challenger = contestTownLabel(contest.getChallengerOwner(), viewerTown);
+        return "Contested: " + defender + " vs " + challenger;
+    }
+
+    private String contestTownLabel(UUID owner, Town viewerTown) {
+        if (viewerTown != null && owner != null && owner.equals(viewerTown.getOwner())) {
+            ChatColor color = toBukkitColor(viewerTown.getColor());
+            return (color != null ? color.toString() : ChatColor.GREEN.toString()) + "You" + ChatColor.RESET;
+        }
+        Town town = owner == null ? null : townsByOwner.get(owner);
+        if (town != null) return coloredTownName(town);
+        return ownerName(owner);
     }
 
     private String plainTownName(UUID owner) {
@@ -1571,38 +1639,54 @@ public class TownManager {
     }
 
     public List<String> buildContestLines() {
-        return buildContestLines(new ArrayList<>(contestsById.values()));
+        return buildContestLines(new ArrayList<>(contestsById.values()), null);
     }
 
     public List<String> buildContestLinesForOwner(UUID owner) {
         if (owner == null) return Collections.emptyList();
-        List<ContestState> contests = new ArrayList<>();
-        for (ContestState contest : contestsById.values()) {
-            if (owner.equals(contest.getDefenderOwner()) || owner.equals(contest.getChallengerOwner())) {
-                contests.add(contest);
-            }
-        }
-        return buildContestLines(contests);
+        List<ContestState> contests = contestsForOwner(owner);
+        Town viewerTown = townsByOwner.get(owner);
+        return buildContestLines(contests, viewerTown);
     }
 
     public List<String> buildContestLinesForPlayer(UUID playerId) {
         Optional<Town> townOpt = getTownOf(playerId);
         if (townOpt.isEmpty()) return Collections.emptyList();
-        return buildContestLinesForOwner(townOpt.get().getOwner());
+        return buildContestLines(contestsForOwner(townOpt.get().getOwner()), townOpt.get());
     }
 
-    private List<String> buildContestLines(List<ContestState> contests) {
+    private List<ContestState> contestsForOwner(UUID owner) {
+        List<ContestState> contests = new ArrayList<>();
+        if (owner == null) return contests;
+        for (ContestState contest : contestsById.values()) {
+            if (owner.equals(contest.getDefenderOwner()) || owner.equals(contest.getChallengerOwner())) {
+                contests.add(contest);
+            }
+        }
+        return contests;
+    }
+
+    private List<String> buildContestLines(List<ContestState> contests, Town viewerTown) {
         contests.sort(Comparator.comparingLong(ContestState::getRemainingMs));
         List<String> lines = new ArrayList<>();
+        int idx = 1;
         for (ContestState contest : contests) {
-            Town defender = townsByOwner.get(contest.getDefenderOwner());
-            Town challenger = townsByOwner.get(contest.getChallengerOwner());
-            String defenderName = defender != null ? coloredTownName(defender) : ownerName(contest.getDefenderOwner());
-            String challengerName = challenger != null ? coloredTownName(challenger) : ownerName(contest.getChallengerOwner());
+            String defenderName = contestTownLabel(contest.getDefenderOwner(), viewerTown);
+            String challengerName = contestTownLabel(contest.getChallengerOwner(), viewerTown);
             long remaining = Math.max(0L, contest.getRemainingMs());
             String time = formatRemaining(remaining);
-            String paused = contest.isPaused() ? ChatColor.RED + " paused" : "";
-            lines.add(defenderName + ChatColor.GRAY + " vs " + challengerName + ChatColor.GRAY + " (" + contest.getChunkCount() + ") " + ChatColor.YELLOW + time + paused);
+            String paused = contest.isPaused() ? scoreboardContestPausedText : "";
+            String line = formatTemplate(
+                    scoreboardContestEntryFormat,
+                    "index", String.valueOf(idx),
+                    "defender", defenderName,
+                    "challenger", challengerName,
+                    "chunks", String.valueOf(contest.getChunkCount()),
+                    "time", time,
+                    "paused", paused
+            );
+            lines.add(line);
+            idx++;
         }
         return lines;
     }
@@ -1644,8 +1728,7 @@ public class TownManager {
     public void applyScoreboard(Player p) {
         ScoreboardManager mgr = Bukkit.getScoreboardManager();
         UUID id = p.getUniqueId();
-        boolean inContest = isContestParticipant(id);
-        if (inContest || !leaderboardDisabled.contains(id)) {
+        if (!leaderboardDisabled.contains(id)) {
             if (mgr != null && !leaderboardBoards.containsKey(id)) refreshLeaderboardScoreboard();
             Scoreboard lb = leaderboardBoards.get(id);
             if (lb != null) { p.setScoreboard(lb); return; }
@@ -1679,7 +1762,7 @@ public class TownManager {
         for (Player online : Bukkit.getOnlinePlayers()) {
             UUID viewer = online.getUniqueId();
             boolean inContest = isContestParticipant(viewer);
-            boolean shouldShow = inContest || !leaderboardDisabled.contains(viewer);
+            boolean shouldShow = !leaderboardDisabled.contains(viewer);
             if (!shouldShow) {
                 leaderboardBoards.remove(viewer);
                 online.setScoreboard(mgr.getMainScoreboard());
@@ -1694,7 +1777,7 @@ public class TownManager {
 
     private Scoreboard buildLeaderboardBoard(ScoreboardManager mgr, UUID viewer, List<Town> killsTop, List<Town> claimsTop, List<String> contests) {
         Scoreboard board = mgr.getNewScoreboard();
-        Objective obj = board.registerNewObjective("vc_leaders", "dummy", ChatColor.GOLD + "" + ChatColor.BOLD + "Leaderboard");
+        Objective obj = board.registerNewObjective("vc_leaders", "dummy", scoreboardTitle);
         obj.setDisplaySlot(DisplaySlot.SIDEBAR);
 
         int score = 15;
@@ -1703,35 +1786,43 @@ public class TownManager {
         boolean hasContests = contests != null && !contests.isEmpty();
 
         if (hasContests) {
-            if (score > TIP_SCORE) obj.getScore(uniqueLine(ChatColor.RED + "Contested Chunks", unique++)).setScore(score--);
-            int idx = 1;
+            if (score > TIP_SCORE) obj.getScore(uniqueLine(scoreboardContestedTitle, unique++)).setScore(score--);
             for (String line : contests) {
                 if (score <= TIP_SCORE) break;
-                obj.getScore(uniqueLine(ChatColor.WHITE + "" + idx + ". " + line, unique++)).setScore(score--);
-                idx++;
+                obj.getScore(uniqueLine(line, unique++)).setScore(score--);
             }
         } else {
-            if (score > TIP_SCORE) obj.getScore(uniqueLine(ChatColor.AQUA + "Top Kills", unique++)).setScore(score--);
+            if (score > TIP_SCORE) obj.getScore(uniqueLine(scoreboardTopKillsTitle, unique++)).setScore(score--);
             if (killsTop.isEmpty()) {
-                if (score > TIP_SCORE) obj.getScore(uniqueLine(ChatColor.GRAY + "None", unique++)).setScore(score--);
+                if (score > TIP_SCORE) obj.getScore(uniqueLine(scoreboardNoneLine, unique++)).setScore(score--);
             } else {
                 int idx = 1;
                 for (Town t : killsTop) {
                     if (score <= TIP_SCORE) break;
-                    String line = ChatColor.WHITE + "" + idx + ". " + coloredTownNameWithReputation(t) + ChatColor.GRAY + " (" + t.getKills() + ")";
+                    String line = formatTemplate(
+                            scoreboardTopEntryFormat,
+                            "index", String.valueOf(idx),
+                            "town", coloredTownNameWithReputation(t),
+                            "value", String.valueOf(t.getKills())
+                    );
                     obj.getScore(uniqueLine(line, unique++)).setScore(score--);
                     idx++;
                 }
             }
 
-            if (score > TIP_SCORE) obj.getScore(uniqueLine(ChatColor.YELLOW + "Top Claims", unique++)).setScore(score--);
+            if (score > TIP_SCORE) obj.getScore(uniqueLine(scoreboardTopClaimsTitle, unique++)).setScore(score--);
             if (claimsTop.isEmpty()) {
-                if (score > TIP_SCORE) obj.getScore(uniqueLine(ChatColor.GRAY + "None", unique++)).setScore(score--);
+                if (score > TIP_SCORE) obj.getScore(uniqueLine(scoreboardNoneLine, unique++)).setScore(score--);
             } else {
                 int idx = 1;
                 for (Town t : claimsTop) {
                     if (score <= TIP_SCORE) break;
-                    String line = ChatColor.WHITE + "" + idx + ". " + coloredTownNameWithReputation(t) + ChatColor.GRAY + " (" + t.claimCount() + ")";
+                    String line = formatTemplate(
+                            scoreboardTopEntryFormat,
+                            "index", String.valueOf(idx),
+                            "town", coloredTownNameWithReputation(t),
+                            "value", String.valueOf(t.claimCount())
+                    );
                     obj.getScore(uniqueLine(line, unique++)).setScore(score--);
                     idx++;
                 }
@@ -1747,19 +1838,19 @@ public class TownManager {
                         }
                         return stats.getClaims();
                     });
-            obj.getScore(uniqueLine(ChatColor.GRAY + "----------------", unique++)).setScore(score--);
-            if (score > TIP_SCORE) obj.getScore(uniqueLine(ChatColor.GREEN + "You", unique++)).setScore(score--);
-            if (score > TIP_SCORE) obj.getScore(uniqueLine(playerStatLine("Kills", stats.getKills()), unique++)).setScore(score--);
-            if (score > TIP_SCORE) obj.getScore(uniqueLine(playerStatLine("Deaths", stats.getDeaths()), unique++)).setScore(score--);
-            if (score > TIP_SCORE) obj.getScore(uniqueLine(playerStatLine("Claims", claimCount), unique++)).setScore(score--);
+            obj.getScore(uniqueLine(scoreboardSeparatorLine, unique++)).setScore(score--);
+            if (score > TIP_SCORE) obj.getScore(uniqueLine(scoreboardYouTitle, unique++)).setScore(score--);
+            if (score > TIP_SCORE) obj.getScore(uniqueLine(playerStatLine(scoreboardYouKillsFormat, stats.getKills()), unique++)).setScore(score--);
+            if (score > TIP_SCORE) obj.getScore(uniqueLine(playerStatLine(scoreboardYouDeathsFormat, stats.getDeaths()), unique++)).setScore(score--);
+            if (score > TIP_SCORE) obj.getScore(uniqueLine(playerStatLine(scoreboardYouClaimsFormat, claimCount), unique++)).setScore(score--);
         }
 
-        obj.getScore(uniqueLine(ChatColor.GRAY + "Hide this with /lb toggle", unique++)).setScore(TIP_SCORE);
+        obj.getScore(uniqueLine(scoreboardHideTip, unique++)).setScore(TIP_SCORE);
         return board;
     }
 
-    private String playerStatLine(String label, int value) {
-        return ChatColor.WHITE + label + ": " + ChatColor.YELLOW + value;
+    private String playerStatLine(String format, int value) {
+        return formatTemplate(format, "value", String.valueOf(value));
     }
 
     private String uniqueLine(String line, int index) {

@@ -56,6 +56,26 @@ default-color: GREEN
 fill-opacity: 0.35
 line-opacity: 0.9
 line-weight: 2
+
+# Scoreboard styling (uses & color codes)
+scoreboard:
+  title: "&6&lLeaderboard"
+  top-kills-title: "&bTop Kills"
+  top-claims-title: "&eTop Claims"
+  contested-title: "&cContested Chunks"
+  you-title: "&aYou"
+  none: "&7None"
+  separator: "&7----------------"
+  hide-tip: "&7Hide this with &e/lb toggle"
+  # Placeholders: {index} {town} {value}
+  top-entry-format: "&f{index}. {town} &7({value})"
+  # Placeholders: {value}
+  you-kills-format: "&fKills: &e{value}"
+  you-deaths-format: "&fDeaths: &e{value}"
+  you-claims-format: "&fClaims: &e{value}"
+  # Placeholders: {index} {defender} {challenger} {chunks} {time} {paused}
+  contest-entry-format: "&f{index}. {defender} &7vs {challenger} &7({chunks}) &e{time}{paused}"
+  contest-paused-text: "&c paused"
 ```
 
 - `max-claims-per-player`: Hard cap on chunks per town; admins with `visclaims.admin` bypass it.
@@ -63,6 +83,7 @@ line-weight: 2
 - `chunks-per-hour`: Chunk allowance per played hour when playtime scaling is enabled.
 - `default-color`: Applied to newly created towns; value must match a vanilla chat colour name.
 - Marker style keys tweak the appearance of the Dynmap polygons.
+- `scoreboard.*`: Customize the sidebar text/colors with `&` codes. `top-entry-format` uses `{index}`, `{town}`, `{value}`; `contest-entry-format` uses `{index}`, `{defender}`, `{challenger}`, `{chunks}`, `{time}`, `{paused}`.
 - Restart the server (or reload VisualClaims) after editing the config to apply changes.
 
 ## Commands & Permissions

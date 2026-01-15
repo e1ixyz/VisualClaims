@@ -123,7 +123,7 @@ public class MoveListener implements Listener {
         UUID currentOwner = currentTown != null ? currentTown.getOwner() : null;
         boolean showMessages = shouldShowChunkMessages(uuid);
 
-        String contestLabel = townManager.getContestLabel(pos);
+        String contestLabel = townManager.getContestLabel(pos, uuid);
         String currentLabel = contestLabel != null ? contestLabel : (currentTown != null ? townManager.coloredTownName(currentTown) : null);
         String prevLabel = lastAreaLabel.get(uuid);
 
