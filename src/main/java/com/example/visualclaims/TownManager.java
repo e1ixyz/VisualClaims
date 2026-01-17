@@ -43,6 +43,7 @@ public class TownManager {
     private static final long CONTEST_IMMUNITY_MS = 7 * 24 * 60 * 60 * 1000L;
     private static final long PENDING_CONTEST_TTL_MS = 15 * 1000L;
     private static final long MIN_TOWN_AGE_MS = 24 * 60 * 60 * 1000L;
+    private static final long CAPITAL_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000L;
     private static final long RPS_TTL_MS = 60 * 1000L;
     private static final ChatColor[] SCOREBOARD_SUFFIXES = new ChatColor[] {
             ChatColor.BLACK,
@@ -756,10 +757,20 @@ public class TownManager {
         return cluster.containsAll(capital);
     }
 
+    public long getCapitalCooldownRemainingMs(Town town) {
+        if (town == null) return 0L;
+        long lastSet = town.getCapitalSetAt();
+        if (lastSet <= 0L) return 0L;
+        long remaining = lastSet + CAPITAL_COOLDOWN_MS - System.currentTimeMillis();
+        return Math.max(0L, remaining);
+    }
+
     public boolean setCapitalOutpost(Town town, Set<ChunkPos> cluster) {
         if (town == null || cluster == null || cluster.isEmpty()) return false;
         if (town.getClaims() == null || !town.getClaims().containsAll(cluster)) return false;
+        if (getCapitalCooldownRemainingMs(town) > 0L) return false;
         town.setCapitalClaims(new HashSet<>(cluster));
+        town.setCapitalSetAt(System.currentTimeMillis());
         saveTown(town);
         refreshTownAreas(town);
         return true;
@@ -1734,20 +1745,12 @@ public class TownManager {
         }
         groups.sort((a, b) -> Integer.compare(b.size(), a.size()));
         List<String> lines = new ArrayList<>();
-        int maxNames = 3;
         for (List<Town> group : groups) {
             group.sort(Comparator.comparing(town -> town.getName() == null ? "" : town.getName(), String.CASE_INSENSITIVE_ORDER));
             StringBuilder sb = new StringBuilder();
-            int shown = 0;
             for (Town t : group) {
-                if (shown >= maxNames) break;
-                if (shown > 0) sb.append(ChatColor.GRAY).append(" + ");
+                if (sb.length() > 0) sb.append(ChatColor.GRAY).append(" + ");
                 sb.append(coloredTownName(t));
-                shown++;
-            }
-            int remaining = group.size() - shown;
-            if (remaining > 0) {
-                sb.append(ChatColor.GRAY).append(" +").append(remaining);
             }
             lines.add(sb.toString());
         }
@@ -1875,7 +1878,8 @@ public class TownManager {
     public void applyScoreboard(Player p) {
         ScoreboardManager mgr = Bukkit.getScoreboardManager();
         UUID id = p.getUniqueId();
-        if (getScoreboardMode(id) != ScoreboardMode.OFF) {
+        boolean inContest = isContestParticipant(id);
+        if (getScoreboardMode(id) != ScoreboardMode.OFF || inContest) {
             if (mgr != null && !leaderboardBoards.containsKey(id)) refreshLeaderboardScoreboard();
             Scoreboard lb = leaderboardBoards.get(id);
             if (lb != null) { p.setScoreboard(lb); return; }
@@ -1897,7 +1901,7 @@ public class TownManager {
             UUID viewer = online.getUniqueId();
             ScoreboardMode mode = getScoreboardMode(viewer);
             boolean inContest = isContestParticipant(viewer);
-            boolean shouldShow = mode != ScoreboardMode.OFF;
+            boolean shouldShow = mode != ScoreboardMode.OFF || inContest;
             if (!shouldShow) {
                 leaderboardBoards.remove(viewer);
                 online.setScoreboard(mgr.getMainScoreboard());
@@ -2093,11 +2097,11 @@ public class TownManager {
 
     public String formatReputation(Town t) {
         int rep = t != null ? t.getReputation() : 0;
-        if (rep <= -6) return ChatColor.DARK_RED + "---" + ChatColor.RESET;
-        if (rep <= -3) return ChatColor.RED + "--" + ChatColor.RESET;
-        if (rep <= -1) return ChatColor.GOLD + "-" + ChatColor.RESET;
-        if (rep <= 2) return ChatColor.YELLOW + "+" + ChatColor.RESET;
-        return ChatColor.GREEN + "++" + ChatColor.RESET;
+        if (rep >= 10) return ChatColor.GREEN + "++" + ChatColor.RESET;
+        if (rep >= 6) return ChatColor.YELLOW + "+" + ChatColor.RESET;
+        if (rep >= 2) return ChatColor.GOLD + "-" + ChatColor.RESET;
+        if (rep >= -2) return ChatColor.RED + "--" + ChatColor.RESET;
+        return ChatColor.DARK_RED + "---" + ChatColor.RESET;
     }
 
     public String formatReputationWithValue(Town t) {

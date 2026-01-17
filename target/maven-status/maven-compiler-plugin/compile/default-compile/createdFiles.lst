@@ -1,12 +1,12 @@
 com/example/visualclaims/MoveListener.class
+com/example/visualclaims/CommandHandler.class
+com/example/visualclaims/ChunkPos.class
 com/example/visualclaims/AllianceInvite.class
 com/example/visualclaims/Town.class
 com/example/visualclaims/TownManager.class
 com/example/visualclaims/DynmapHook.class
 com/example/visualclaims/TownManager$1.class
 com/example/visualclaims/VisualClaims.class
-com/example/visualclaims/CommandHandler.class
 com/example/visualclaims/ChunkHistoryEntry.class
-com/example/visualclaims/ChunkPos.class
 com/example/visualclaims/TownInvite.class
 com/example/visualclaims/VanillaColor.class

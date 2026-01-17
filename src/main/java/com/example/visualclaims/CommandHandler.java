@@ -22,6 +22,24 @@ import java.util.concurrent.TimeUnit;
 public class CommandHandler implements CommandExecutor {
     private final VisualClaims plugin;
     private final TownManager towns;
+    private static final long PENDING_TRANSFER_TTL_MS = 15 * 1000L;
+    private final java.util.Map<UUID, PendingTransfer> pendingTransfers = new java.util.HashMap<>();
+
+    private static class PendingTransfer {
+        private final UUID targetOwner;
+        private final String chunkId;
+        private final long createdAt;
+
+        private PendingTransfer(UUID targetOwner, String chunkId, long createdAt) {
+            this.targetOwner = targetOwner;
+            this.chunkId = chunkId;
+            this.createdAt = createdAt;
+        }
+
+        private boolean isExpired(long now) {
+            return createdAt + PENDING_TRANSFER_TTL_MS < now;
+        }
+    }
 
     public CommandHandler(VisualClaims plugin, TownManager towns) {
         this.plugin = plugin;
@@ -459,6 +477,22 @@ public class CommandHandler implements CommandExecutor {
             p.sendMessage("§cUnable to locate the outpost cluster.");
             return true;
         }
+        UUID playerId = p.getUniqueId();
+        long now = System.currentTimeMillis();
+        PendingTransfer pending = pendingTransfers.get(playerId);
+        if (pending != null && pending.isExpired(now)) {
+            pendingTransfers.remove(playerId);
+            pending = null;
+        }
+        if (pending == null
+                || !pending.chunkId.equals(pos.id())
+                || !pending.targetOwner.equals(to.getOwner())) {
+            pendingTransfers.put(playerId, new PendingTransfer(to.getOwner(), pos.id(), now));
+            p.sendMessage("§eThis will transfer §f" + cluster.size() + "§e chunks to §f" + towns.coloredTownName(to) + "§e.");
+            p.sendMessage("§7Run §e/transferoutpost " + to.getName() + " §7again within 15 seconds to confirm.");
+            return true;
+        }
+        pendingTransfers.remove(playerId);
         boolean ok = towns.transferOutpost(from, to, cluster);
         if (!ok) {
             p.sendMessage("§cUnable to transfer this outpost.");
@@ -606,6 +640,11 @@ public class CommandHandler implements CommandExecutor {
         }
         if (towns.isChunkContested(pos)) {
             p.sendMessage("§cYou cannot set a capital while the outpost is contested.");
+            return true;
+        }
+        long cooldown = towns.getCapitalCooldownRemainingMs(t);
+        if (cooldown > 0L) {
+            p.sendMessage("§cYou must wait §e" + formatDuration(cooldown) + "§c before setting a new capital.");
             return true;
         }
         Set<ChunkPos> cluster = towns.getClaimCluster(t, pos);

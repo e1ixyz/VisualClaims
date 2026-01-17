@@ -26,6 +26,7 @@ public class Town {
     private long createdAt = 0L;
     private int reputation = MAX_REPUTATION;
     private boolean reputationInitialized = false;
+    private long capitalSetAt = 0L;
 
     // For Gson
     public Town() {}
@@ -101,6 +102,8 @@ public class Town {
     public void setReputation(int reputation) { this.reputation = reputation; }
     public boolean isReputationInitialized() { return reputationInitialized; }
     public void setReputationInitialized(boolean reputationInitialized) { this.reputationInitialized = reputationInitialized; }
+    public long getCapitalSetAt() { return capitalSetAt; }
+    public void setCapitalSetAt(long capitalSetAt) { this.capitalSetAt = capitalSetAt; }
     public void addReputation(int delta) {
         int next = this.reputation + delta;
         if (next > MAX_REPUTATION) next = MAX_REPUTATION;

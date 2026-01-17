@@ -57,6 +57,15 @@ fill-opacity: 0.35
 line-opacity: 0.9
 line-weight: 2
 
+# Claim safety (basic grief prevention within claims)
+claim-protection:
+  prevent-fire: true
+  prevent-fire-spread: true
+  prevent-lava: true
+  prevent-lava-flow: true
+  prevent-tnt: true
+  prevent-tnt-explosions: true
+
 # Scoreboard styling (uses & color codes)
 scoreboard:
   title: "&6&lLeaderboard"
@@ -86,6 +95,7 @@ scoreboard:
 - `chunks-per-hour`: Chunk allowance per played hour when playtime scaling is enabled.
 - `default-color`: Applied to newly created towns; value must match a vanilla chat colour name.
 - Marker style keys tweak the appearance of the Dynmap polygons.
+- `claim-protection.*`: Toggle basic claim safety (fire, lava, TNT). These only apply inside claimed chunks.
 - `scoreboard.*`: Customize the sidebar text/colors with `&` codes. `top-entry-format` uses `{index}`, `{town}`, `{value}`; `alliance-entry-format` uses `{index}`, `{alliance}`; `contest-entry-format` uses `{index}`, `{defender}`, `{challenger}`, `{chunks}`, `{time}`, `{paused}`.
 - Restart the server (or reload VisualClaims) after editing the config to apply changes.
 
@@ -161,7 +171,7 @@ Playtime scaling reads the built-in `Statistic.PLAY_ONE_MINUTE` (same counter us
 - Movement messages fire whenever you cross chunk boundaries—whether you walk or teleport—so players always know when they enter or leave a town.
 - Use `/claimalerts` to mute your personal enter/leave messages. Staff (or anyone with `visclaims.silentvisit`) can toggle `/silentvisit` to avoid alerting other towns when passing through their land.
 - `/leaderboard` (aliases `/lb`, `/leadboard`) shows the top 3 towns by kills, then claims, plus your own kills/deaths/claims. Add `toggle` to cycle the sidebar (off/leaderboard/alliances).
-- Use `/setcapital` to mark the current outpost as your capital. Capital chunks display `Capital: <town>` and contesting a capital costs 3x (and doubles again if won by holding).
+- Use `/setcapital` to mark the current outpost as your capital (7-day cooldown). Capital chunks display `Capital: <town>` and contesting a capital costs 3x (and doubles again if won by holding).
 - Claiming another town’s chunk prompts a 1-hour outpost contest. The timer ticks while both owners are online; if both were online when the contest started, the hold timer continues even if the defender logs off. The challenger must spend claims scaled by outpost size and reputation; this cost is permanent and never refunded. Use `/contest cancel` to forfeit without a refund.
 - Contests auto-expire after 7 days with no refund, even if the timer hasn’t fully ticked down.
 - Only one contest can be active per outpost at a time. Contested chunks turn gray on Dynmap, and the contest can be won by owner kill, full-time occupation (double cost; leaving the outpost cancels the hold win), or Rock Paper Scissors. If no win occurs, the land reverts and becomes immune from contesting for 7 days.

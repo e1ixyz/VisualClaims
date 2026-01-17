@@ -9,6 +9,7 @@ public class VisualClaims extends JavaPlugin {
     private DynmapHook dynmapHook;
     private MoveListener moveListener;
     private CombatListener combatListener;
+    private ClaimProtectionListener claimProtectionListener;
 
     @Override
     public void onEnable() {
@@ -70,6 +71,8 @@ public class VisualClaims extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(moveListener, this);
         combatListener = new CombatListener(townManager);
         Bukkit.getPluginManager().registerEvents(combatListener, this);
+        claimProtectionListener = new ClaimProtectionListener(this, townManager);
+        Bukkit.getPluginManager().registerEvents(claimProtectionListener, this);
 
         getLogger().info("VisualClaims enabled.");
     }
