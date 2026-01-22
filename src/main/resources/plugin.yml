@@ -22,6 +22,10 @@ commands:
     description: Unclaim the current chunk
     usage: /unclaim
     permission: visclaims.unclaim
+  unclaimoutpost:
+    description: Unclaim the entire outpost (15s confirm)
+    usage: /unclaimoutpost
+    permission: visclaims.unclaim
   autoclaim:
     description: Toggle autoclaim for chunks
     usage: /autoclaim

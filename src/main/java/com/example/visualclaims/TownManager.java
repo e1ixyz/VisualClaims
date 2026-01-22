@@ -391,6 +391,16 @@ public class TownManager {
         return true;
     }
 
+    public boolean hasPendingAllianceInvite(UUID targetOwner) {
+        AllianceInvite invite = pendingAllianceInvites.get(targetOwner);
+        if (invite == null) return false;
+        if (invite.isExpired(System.currentTimeMillis(), ALLIANCE_INVITE_TTL_MS)) {
+            pendingAllianceInvites.remove(targetOwner);
+            return false;
+        }
+        return true;
+    }
+
     public boolean removeAlliance(UUID owner, UUID otherOwner) {
         Town a = townsByOwner.get(owner);
         Town b = townsByOwner.get(otherOwner);

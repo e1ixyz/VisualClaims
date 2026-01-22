@@ -106,6 +106,7 @@ scoreboard:
 | `/deletetown` | Delete your town and free all chunks. | `visclaims.deletetown` | true |
 | `/claimchunk` | Claim the chunk you are standing in (prompts a contest if owned by another town). | `visclaims.claim` | true |
 | `/unclaim` | Unclaim the current chunk (admins can force-unclaim). | `visclaims.unclaim` | true |
+| `/unclaimoutpost` | Unclaim the entire outpost you are standing in (15s confirm). | `visclaims.unclaim` | true |
 | `/autoclaim` | Toggle automatic claiming while you walk. | `visclaims.autoclaim` | true |
 | `/autounclaim` | Toggle automatic unclaiming of owned chunks as you walk. | `visclaims.autounclaim` | true |
 | `/autohistory` | Toggle automatic chunk history popups while you walk. | `visclaims.autohistory` | true |

@@ -24,6 +24,8 @@ public class CommandHandler implements CommandExecutor {
     private final TownManager towns;
     private static final long PENDING_TRANSFER_TTL_MS = 15 * 1000L;
     private final java.util.Map<UUID, PendingTransfer> pendingTransfers = new java.util.HashMap<>();
+    private static final long PENDING_UNCLAIM_OUTPOST_TTL_MS = 15 * 1000L;
+    private final java.util.Map<UUID, PendingUnclaimOutpost> pendingUnclaimOutposts = new java.util.HashMap<>();
 
     private static class PendingTransfer {
         private final UUID targetOwner;
@@ -38,6 +40,20 @@ public class CommandHandler implements CommandExecutor {
 
         private boolean isExpired(long now) {
             return createdAt + PENDING_TRANSFER_TTL_MS < now;
+        }
+    }
+
+    private static class PendingUnclaimOutpost {
+        private final String chunkId;
+        private final long createdAt;
+
+        private PendingUnclaimOutpost(String chunkId, long createdAt) {
+            this.chunkId = chunkId;
+            this.createdAt = createdAt;
+        }
+
+        private boolean isExpired(long now) {
+            return createdAt + PENDING_UNCLAIM_OUTPOST_TTL_MS < now;
         }
     }
 
@@ -89,6 +105,7 @@ public class CommandHandler implements CommandExecutor {
             case "alliance": return allianceCommand(p, args);
             case "claimadmin": return claimAdminHelp(p, args);
             case "admindeletetown": return adminDeleteTown(p, args);
+            case "unclaimoutpost": return unclaimOutpost(p);
             default: return false;
         }
     }
@@ -506,6 +523,53 @@ public class CommandHandler implements CommandExecutor {
         return true;
     }
 
+    private boolean unclaimOutpost(Player p) {
+        if (!p.hasPermission("visclaims.unclaim")) {
+            p.sendMessage("§cNo permission.");
+            return true;
+        }
+        UUID id = p.getUniqueId();
+        ChunkPos pos = ChunkPos.of(p.getLocation().getChunk());
+        Optional<Town> townOpt = towns.getTownOf(id);
+        if (townOpt.isEmpty()) {
+            p.sendMessage("§cYou are not in a town.");
+            return true;
+        }
+        Town town = townOpt.get();
+        if (!town.ownsChunk(pos)) {
+            p.sendMessage("§cThis chunk is not part of your town.");
+            return true;
+        }
+        if (towns.isChunkContested(pos)) {
+            p.sendMessage("§cYou cannot unclaim contested chunks.");
+            return true;
+        }
+        Set<ChunkPos> cluster = towns.getClaimCluster(town, pos);
+        if (cluster.isEmpty()) {
+            p.sendMessage("§cUnable to locate the outpost cluster.");
+            return true;
+        }
+        long now = System.currentTimeMillis();
+        PendingUnclaimOutpost pending = pendingUnclaimOutposts.get(id);
+        if (pending != null && pending.isExpired(now)) {
+            pendingUnclaimOutposts.remove(id);
+            pending = null;
+        }
+        if (pending == null || !pending.chunkId.equals(pos.id())) {
+            pendingUnclaimOutposts.put(id, new PendingUnclaimOutpost(pos.id(), now));
+            p.sendMessage("§eThis will unclaim §f" + cluster.size() + "§e chunks from your town.");
+            p.sendMessage("§7Run §e/unclaimoutpost §7again within 15 seconds to confirm.");
+            return true;
+        }
+        pendingUnclaimOutposts.remove(id);
+        int removed = 0;
+        for (ChunkPos claim : new java.util.HashSet<>(cluster)) {
+            if (towns.unclaimChunk(town, claim)) removed++;
+        }
+        p.sendMessage("§aUnclaimed §e" + removed + "§a chunks from this outpost.");
+        return true;
+    }
+
     private boolean adjustClaims(Player p, String[] args) {
         if (!p.hasPermission("visclaims.admin")) {
             p.sendMessage("§cNo permission.");
@@ -573,6 +637,7 @@ public class CommandHandler implements CommandExecutor {
         p.sendMessage("§f/contest §7- Learn about contesting land and Rock Paper Scissors");
         p.sendMessage("§f/contest cancel §7- Forfeit your active contest (no refund)");
         p.sendMessage("§f/unclaim §7- Unclaim the current chunk");
+        p.sendMessage("§f/unclaimoutpost §7- Unclaim the entire outpost (15s confirm)");
         p.sendMessage("§f/autoclaim §7- Toggle autoclaim for chunks");
         p.sendMessage("§f/autounclaim §7- Toggle auto-unclaim for owned chunks as you move");
         p.sendMessage("§f/autohistory §7- Toggle automatic chunk history feed");
@@ -1179,13 +1244,22 @@ public class CommandHandler implements CommandExecutor {
             p.sendMessage("§cYou are already allied with that town.");
             return true;
         }
+        if (towns.hasPendingAllianceInvite(other.getOwner())) {
+            p.sendMessage("§cThat town already has a pending alliance invite.");
+            return true;
+        }
+        Player otherOwner = plugin.getServer().getPlayer(other.getOwner());
+        if (otherOwner == null || !otherOwner.isOnline()) {
+            p.sendMessage("§cThat town's owner must be online to receive an alliance invite.");
+            return true;
+        }
         boolean ok = towns.sendAllianceInvite(myTown.getOwner(), other.getOwner());
         if (!ok) {
             p.sendMessage("§cFailed to send alliance invite.");
             return true;
         }
         p.sendMessage("§aAlliance invite sent to §e" + towns.coloredTownName(other));
-        towns.messageTown(other, "§a" + towns.coloredTownName(myTown) + " §7has invited you to form an alliance. Owner can use §e/alliance accept " + myTown.getName() + " §7to accept.");
+        otherOwner.sendMessage("§a" + towns.coloredTownName(myTown) + " §7has invited you to form an alliance. Use §e/alliance accept " + myTown.getName() + " §7to accept.");
         return true;
     }
 
