@@ -116,6 +116,8 @@ public class TownManager {
     private String scoreboardContestPausedText;
     private BukkitTask contestTask;
     private BossBar contestBossBar;
+    private boolean warmodeEnabled = false;
+    private BossBar warmodeBossBar;
 
     public TownManager(VisualClaims plugin, DynmapHook dynmap) {
         this.plugin = plugin;
@@ -1899,13 +1901,44 @@ public class TownManager {
         }
     }
 
+    public boolean isWarmodeEnabled() {
+        return warmodeEnabled;
+    }
+
+    public boolean toggleWarmode() {
+        warmodeEnabled = !warmodeEnabled;
+        if (warmodeEnabled) {
+            if (warmodeBossBar == null) {
+                warmodeBossBar = Bukkit.createBossBar(ChatColor.RED + "" + ChatColor.BOLD + "WAR MODE: All grief protection disabled", BarColor.RED, BarStyle.SOLID);
+            }
+            warmodeBossBar.setVisible(true);
+            for (Player p : Bukkit.getOnlinePlayers()) {
+                warmodeBossBar.addPlayer(p);
+            }
+        } else if (warmodeBossBar != null) {
+            warmodeBossBar.removeAll();
+            warmodeBossBar.setVisible(false);
+        }
+        return warmodeEnabled;
+    }
+
+    public void applyWarmodeBar(Player player) {
+        if (!warmodeEnabled || warmodeBossBar == null || player == null) return;
+        warmodeBossBar.addPlayer(player);
+    }
+
+    public void removeWarmodeBar(Player player) {
+        if (warmodeBossBar == null || player == null) return;
+        warmodeBossBar.removePlayer(player);
+    }
+
     public void refreshLeaderboardScoreboard() {
         ScoreboardManager mgr = Bukkit.getScoreboardManager();
         if (mgr == null) return;
 
         List<Town> killsTop = topByKills(3);
         List<Town> claimsTop = topByClaims(3);
-        List<String> alliances = buildAllianceGroupLines();
+        List<String> alliances = buildAllianceLines();
 
         for (Player online : Bukkit.getOnlinePlayers()) {
             UUID viewer = online.getUniqueId();

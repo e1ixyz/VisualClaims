@@ -83,6 +83,10 @@ commands:
     description: "Admin: remove smallest outpost clusters for a player"
     usage: /trimoutposts <player> [count]
     permission: visclaims.admin
+  warmode:
+    description: "Admin: toggle war mode (disables claim protection)"
+    usage: /warmode
+    permission: visclaims.admin
   claimlimit:
     description: Show playtime-based claim limit
     usage: /claimlimit [player]

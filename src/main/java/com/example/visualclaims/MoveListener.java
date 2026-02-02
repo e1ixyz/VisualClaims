@@ -97,11 +97,13 @@ public class MoveListener implements Listener {
         lastChunkId.remove(id);
         lastAreaLabel.remove(id);
         hiddenChunkMessages.remove(id);
+        townManager.removeWarmodeBar(e.getPlayer());
     }
 
     @EventHandler
     public void onJoin(PlayerJoinEvent e) {
         townManager.applyScoreboard(e.getPlayer());
+        townManager.applyWarmodeBar(e.getPlayer());
     }
 
     private void handleChunkChange(Player p, Chunk to) {

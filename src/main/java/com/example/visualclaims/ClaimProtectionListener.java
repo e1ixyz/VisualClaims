@@ -137,6 +137,7 @@ public class ClaimProtectionListener implements Listener {
     }
 
     private boolean configEnabled(String key, boolean def) {
+        if (towns.isWarmodeEnabled()) return false;
         return plugin.getConfig().getBoolean("claim-protection." + key, def);
     }
 }

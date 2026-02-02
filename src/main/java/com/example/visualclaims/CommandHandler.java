@@ -106,6 +106,7 @@ public class CommandHandler implements CommandExecutor {
             case "claimadmin": return claimAdminHelp(p, args);
             case "admindeletetown": return adminDeleteTown(p, args);
             case "unclaimoutpost": return unclaimOutpost(p);
+            case "warmode": return toggleWarmode(p);
             default: return false;
         }
     }
@@ -567,6 +568,16 @@ public class CommandHandler implements CommandExecutor {
             if (towns.unclaimChunk(town, claim)) removed++;
         }
         p.sendMessage("§aUnclaimed §e" + removed + "§a chunks from this outpost.");
+        return true;
+    }
+
+    private boolean toggleWarmode(Player p) {
+        if (!p.hasPermission("visclaims.admin")) {
+            p.sendMessage("§cNo permission.");
+            return true;
+        }
+        boolean enabled = towns.toggleWarmode();
+        p.sendMessage(enabled ? "§cWar mode enabled. Claim protection is disabled." : "§aWar mode disabled. Claim protection restored.");
         return true;
     }
 
@@ -1273,6 +1284,7 @@ public class CommandHandler implements CommandExecutor {
         p.sendMessage("§f/adjustclaims <player> <add|remove> <amount> §7- Modify bonus claims");
         p.sendMessage("§f/admindeletetown <town> §7- Delete a town by name/owner");
         p.sendMessage("§f/unclaim (with visclaims.admin) §7- Force unclaim any chunk");
+        p.sendMessage("§f/warmode §7- Toggle war mode (disables claim protection)");
         p.sendMessage("§f/trimoutposts <player> [count] §7- Remove the smallest outpost clusters for a player");
         return true;
     }
