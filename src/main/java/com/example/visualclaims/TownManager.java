@@ -1735,26 +1735,34 @@ public class TownManager {
     }
 
     public List<String> buildAllianceGroupLines() {
-        List<List<Town>> groups = new ArrayList<>();
-        Set<UUID> visited = new HashSet<>();
+        Map<UUID, Set<UUID>> graph = new HashMap<>();
         for (Town t : townsByOwner.values()) {
-            if (t == null || visited.contains(t.getOwner())) continue;
+            if (t == null) continue;
+            graph.putIfAbsent(t.getOwner(), new HashSet<>());
+            for (UUID ally : t.getAllies()) {
+                if (ally == null) continue;
+                if (!townsByOwner.containsKey(ally)) continue;
+                graph.computeIfAbsent(t.getOwner(), k -> new HashSet<>()).add(ally);
+            }
+        }
+
+        Set<Set<UUID>> cliques = new HashSet<>();
+        Set<UUID> r = new HashSet<>();
+        Set<UUID> p = new HashSet<>(graph.keySet());
+        Set<UUID> x = new HashSet<>();
+        bronKerbosch(r, p, x, graph, cliques);
+
+        List<List<Town>> groups = new ArrayList<>();
+        for (Set<UUID> clique : cliques) {
+            if (clique.size() < 2) continue;
             List<Town> group = new ArrayList<>();
-            Deque<UUID> queue = new ArrayDeque<>();
-            queue.add(t.getOwner());
-            while (!queue.isEmpty()) {
-                UUID owner = queue.poll();
-                if (owner == null || visited.contains(owner)) continue;
-                Town current = townsByOwner.get(owner);
-                if (current == null) continue;
-                visited.add(owner);
-                group.add(current);
-                for (UUID ally : current.getAllies()) {
-                    if (ally != null && !visited.contains(ally)) queue.add(ally);
-                }
+            for (UUID id : clique) {
+                Town t = townsByOwner.get(id);
+                if (t != null) group.add(t);
             }
             if (group.size() > 1) groups.add(group);
         }
+
         groups.sort((a, b) -> Integer.compare(b.size(), a.size()));
         List<String> lines = new ArrayList<>();
         for (List<Town> group : groups) {
@@ -1767,6 +1775,26 @@ public class TownManager {
             lines.add(sb.toString());
         }
         return lines;
+    }
+
+    private void bronKerbosch(Set<UUID> r, Set<UUID> p, Set<UUID> x, Map<UUID, Set<UUID>> graph, Set<Set<UUID>> cliques) {
+        if (p.isEmpty() && x.isEmpty()) {
+            cliques.add(new HashSet<>(r));
+            return;
+        }
+        Set<UUID> pCopy = new HashSet<>(p);
+        for (UUID v : pCopy) {
+            Set<UUID> neighbors = graph.getOrDefault(v, Collections.emptySet());
+            Set<UUID> rNext = new HashSet<>(r);
+            rNext.add(v);
+            Set<UUID> pNext = new HashSet<>(p);
+            pNext.retainAll(neighbors);
+            Set<UUID> xNext = new HashSet<>(x);
+            xNext.retainAll(neighbors);
+            bronKerbosch(rNext, pNext, xNext, graph, cliques);
+            p.remove(v);
+            x.add(v);
+        }
     }
 
     public List<String> buildContestLines() {
@@ -1938,7 +1966,7 @@ public class TownManager {
 
         List<Town> killsTop = topByKills(3);
         List<Town> claimsTop = topByClaims(3);
-        List<String> alliances = buildAllianceLines();
+        List<String> alliances = buildAllianceGroupLines();
 
         for (Player online : Bukkit.getOnlinePlayers()) {
             UUID viewer = online.getUniqueId();

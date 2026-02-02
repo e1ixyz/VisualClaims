@@ -142,6 +142,7 @@ scoreboard:
 | `/adjustclaims <player> <add|remove> <amount>` | Add or subtract bonus claim slots for a player. | `visclaims.admin` | op |
 | `/trimoutposts <player> [count]` | Remove the smallest outpost clusters for a player. | `visclaims.admin` | op |
 | `/admindeletetown <town>` | Delete a town by name/owner. | `visclaims.admindelete` | op |
+| `/warmode` | Toggle war mode (disables claim protection). | `visclaims.admin` | op |
 | `/claimadmin` | Admin-only help list. | `visclaims.adminhelp` | op |
 
 `visclaims.admin` grants moderators the ability to bypass claim limits and force-unclaim land owned by other towns.

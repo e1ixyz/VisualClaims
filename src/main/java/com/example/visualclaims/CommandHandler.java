@@ -637,8 +637,9 @@ public class CommandHandler implements CommandExecutor {
         p.sendMessage("§f/adjustclaims <player> <add|remove> <amount> §7- Modify bonus claims");
         p.sendMessage("§f/admindeletetown <town> §7- Delete a town by name/owner");
         p.sendMessage("§f/unclaim §7(with visclaims.admin) - Force unclaim any chunk");
-            p.sendMessage("§f/trimoutposts <player> [count] §7- Remove the smallest outpost clusters for a player");
-            return true;
+        p.sendMessage("§f/warmode §7- Toggle war mode (disables claim protection)");
+        p.sendMessage("§f/trimoutposts <player> [count] §7- Remove the smallest outpost clusters for a player");
+        return true;
         }
         p.sendMessage("§e--- Claim Commands ---");
         p.sendMessage("§f/createtown <name> §7- Create your town");
