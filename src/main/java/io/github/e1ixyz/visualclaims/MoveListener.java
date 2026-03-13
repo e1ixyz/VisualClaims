@@ -1,0 +1,248 @@
+package io.github.e1ixyz.visualclaims;
+
+import org.bukkit.Chunk;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+
+import java.util.*;
+
+public class MoveListener implements Listener {
+    private final VisualClaims plugin;
+    private final TownManager townManager;
+    private final Map<UUID, Boolean> autoclaim = new HashMap<>();
+    private final Map<UUID, Boolean> autohistory = new HashMap<>();
+    private final Map<UUID, Boolean> autounclaim = new HashMap<>();
+    private final Map<UUID, String> lastTownAt = new HashMap<>();
+    private final Map<UUID, UUID> lastTownOwner = new HashMap<>();
+    private final Map<UUID, String> lastChunkId = new HashMap<>();
+    private final Map<UUID, String> lastAreaLabel = new HashMap<>();
+    private final Set<UUID> hiddenChunkMessages = new HashSet<>();
+
+    public MoveListener(VisualClaims plugin, TownManager townManager) {
+        this.plugin = plugin;
+        this.townManager = townManager;
+    }
+
+    public boolean toggleAutoclaim(UUID uuid) {
+        boolean now = !autoclaim.getOrDefault(uuid, false);
+        autoclaim.put(uuid, now);
+        return now;
+    }
+
+    public boolean toggleAutohistory(UUID uuid) {
+        boolean now = !autohistory.getOrDefault(uuid, false);
+        autohistory.put(uuid, now);
+        return now;
+    }
+
+    public boolean toggleAutounclaim(UUID uuid) {
+        boolean now = !autounclaim.getOrDefault(uuid, false);
+        autounclaim.put(uuid, now);
+        return now;
+    }
+
+    public boolean toggleChunkAlerts(UUID uuid) {
+        if (hiddenChunkMessages.remove(uuid)) {
+            return true; // now enabled
+        }
+        hiddenChunkMessages.add(uuid);
+        return false; // now disabled
+    }
+
+    public boolean toggleSilentVisits(UUID uuid) {
+        return townManager.toggleSilentVisit(uuid);
+    }
+
+    @EventHandler
+    public void onMove(PlayerMoveEvent e) {
+        if (e.isCancelled()) return;
+        if (e.getFrom() == null || e.getTo() == null) return;
+        Chunk from = e.getFrom().getChunk();
+        Chunk to = e.getTo().getChunk();
+        if (from.equals(to)) return;
+
+        handleChunkChange(e.getPlayer(), to);
+    }
+
+    @EventHandler
+    public void onTeleport(PlayerTeleportEvent e) {
+        if (e.isCancelled()) return;
+        if (e.getFrom() == null || e.getTo() == null) return;
+        Chunk from = e.getFrom().getChunk();
+        Chunk to = e.getTo().getChunk();
+        if (from.equals(to)) return;
+
+        // Disable auto modes on teleport
+        UUID id = e.getPlayer().getUniqueId();
+        if (autoclaim.remove(id) != null) e.getPlayer().sendMessage("§cAutoclaim disabled (teleport).");
+        if (autohistory.remove(id) != null) e.getPlayer().sendMessage("§cAutohistory disabled (teleport).");
+        if (autounclaim.remove(id) != null) e.getPlayer().sendMessage("§cAutounclaim disabled (teleport).");
+
+        handleChunkChange(e.getPlayer(), to);
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent e) {
+        UUID id = e.getPlayer().getUniqueId();
+        autoclaim.remove(id);
+        autohistory.remove(id);
+        autounclaim.remove(id);
+        lastTownAt.remove(id);
+        lastTownOwner.remove(id);
+        lastChunkId.remove(id);
+        lastAreaLabel.remove(id);
+        hiddenChunkMessages.remove(id);
+        townManager.removeWarmodeBar(e.getPlayer());
+    }
+
+    @EventHandler
+    public void onJoin(PlayerJoinEvent e) {
+        townManager.applyScoreboard(e.getPlayer());
+        townManager.applyWarmodeBar(e.getPlayer());
+    }
+
+    private void handleChunkChange(Player p, Chunk to) {
+        ChunkPos pos = new ChunkPos(to.getWorld().getName(), to.getX(), to.getZ());
+        String id = pos.id();
+        if (id.equals(lastChunkId.get(p.getUniqueId()))) return;
+
+        lastChunkId.put(p.getUniqueId(), id);
+        Optional<Town> atTown = townManager.getTownAt(to);
+        updateTownPresence(p, atTown, pos);
+        handleAutoclaim(p, to, atTown);
+        handleAutohistory(p, pos);
+        handleAutounclaim(p, pos);
+    }
+
+    private void updateTownPresence(Player p, Optional<Town> atTown, ChunkPos pos) {
+        UUID uuid = p.getUniqueId();
+        Town currentTown = atTown.orElse(null);
+        UUID currentOwner = currentTown != null ? currentTown.getOwner() : null;
+        boolean showMessages = shouldShowChunkMessages(uuid);
+
+        String contestLabel = townManager.getContestLabel(pos, uuid);
+        String currentLabel;
+        if (contestLabel != null) {
+            currentLabel = contestLabel;
+        } else if (currentTown != null && townManager.isCapitalChunk(currentTown, pos)) {
+            currentLabel = townManager.capitalLabel(currentTown);
+        } else {
+            currentLabel = currentTown != null ? townManager.coloredTownName(currentTown) : null;
+        }
+        String prevLabel = lastAreaLabel.get(uuid);
+
+        if (!Objects.equals(prevLabel, currentLabel)) {
+            if (prevLabel != null && showMessages) {
+                p.sendMessage("§7Now leaving " + prevLabel);
+            }
+            if (currentLabel != null && showMessages) {
+                p.sendMessage("§7Now entering " + currentLabel);
+            }
+            if (currentTown != null) {
+                notifyTownEntry(p, currentTown);
+                lastTownAt.put(uuid, currentTown.getName());
+                lastTownOwner.put(uuid, currentOwner);
+            } else {
+                lastTownAt.remove(uuid);
+                lastTownOwner.remove(uuid);
+            }
+            if (currentLabel != null) {
+                lastAreaLabel.put(uuid, currentLabel);
+            } else {
+                lastAreaLabel.remove(uuid);
+            }
+        }
+    }
+
+    private void handleAutoclaim(Player p, Chunk to, Optional<Town> atTown) {
+        if (!autoclaim.getOrDefault(p.getUniqueId(), false)) return;
+
+        Optional<Town> townOpt = townManager.getTownOf(p.getUniqueId());
+        if (townOpt.isEmpty() || atTown.isPresent()) return;
+
+        Town t = townOpt.get();
+        int max = townManager.computeMaxClaims(t.getOwner());
+        boolean bypass = p.hasPermission("visclaims.admin");
+        ChunkPos pos = ChunkPos.of(to);
+        int allowedOutposts = townManager.computeAllowedOutposts(t.getOwner());
+        int currentOutposts = townManager.countClaimIslands(t);
+        if (townManager.isOverOutpostCap(t, bypass)) {
+            p.sendMessage("§cCannot auto-claim: you have §e" + currentOutposts + "§c outposts but are allowed §e" + allowedOutposts + "§c. Unclaim to continue.");
+            return;
+        }
+        if (townManager.wouldExceedOutpostCap(t, pos, bypass)) {
+            p.sendMessage("§cCannot auto-claim: outpost cap reached (" + currentOutposts + "/" + allowedOutposts + "). Expand an existing cluster or unclaim to free a slot.");
+            return;
+        }
+        boolean ok = townManager.claimChunk(t, to, bypass, p.getUniqueId());
+        if (ok) {
+            p.sendMessage("§aAuto-claimed chunk (" + to.getX() + ", " + to.getZ() + ")");
+        } else if (!bypass && townOpt.get().claimCount() >= max) {
+            p.sendMessage("§cCannot auto-claim chunk: reached max of §e" + max + "§c chunks.");
+        } else if (townManager.getTownAt(to).isPresent()) {
+            p.sendMessage("§cCannot auto-claim chunk: already claimed by another town.");
+        }
+    }
+
+    private void handleAutohistory(Player p, ChunkPos pos) {
+        if (!autohistory.getOrDefault(p.getUniqueId(), false)) return;
+        List<ChunkHistoryEntry> entries = townManager.getHistoryFor(pos);
+        if (entries.isEmpty()) {
+            p.sendMessage("§7History: none for this chunk.");
+            return;
+        }
+        int shown = Math.min(2, entries.size());
+        StringBuilder sb = new StringBuilder("§7History: ");
+        for (int i = 0; i < shown; i++) {
+            ChunkHistoryEntry e = entries.get(i);
+            if (i > 0) sb.append(" §8| ");
+            String townLabel = townManager.coloredTownName(e.getTownOwner(), e.getTownName());
+            sb.append(e.getAction()).append(" ").append(townLabel).append(" (").append(formatAgo(e.getTimestamp())).append(")");
+        }
+        p.sendMessage(sb.toString());
+    }
+
+    private void handleAutounclaim(Player p, ChunkPos pos) {
+        if (!autounclaim.getOrDefault(p.getUniqueId(), false)) return;
+        Optional<Town> townOpt = townManager.getTownOf(p.getUniqueId());
+        if (townOpt.isEmpty()) return;
+        Town t = townOpt.get();
+        if (!t.ownsChunk(pos)) return;
+        boolean ok = townManager.unclaimChunk(t, pos);
+        if (ok) {
+            p.sendMessage("§cAuto-unclaimed chunk (" + pos.getX() + ", " + pos.getZ() + ")");
+        }
+    }
+
+    private void notifyTownEntry(Player entrant, Town town) {
+        Optional<Town> entrantTown = townManager.getTownOf(entrant.getUniqueId());
+        if (entrantTown.isPresent() && entrantTown.get().getOwner().equals(town.getOwner())) return;
+        if (!entrant.hasPermission("visclaims.silentvisit")) {
+            townManager.setSilentVisit(entrant.getUniqueId(), false);
+        } else if (townManager.isSilentVisitor(entrant.getUniqueId())) {
+            return;
+        }
+        String msg = "§e" + entrant.getName() + " §7entered " + townManager.coloredTownName(town) + "§7 territory.";
+        townManager.messageTown(town, msg);
+    }
+
+    private boolean shouldShowChunkMessages(UUID uuid) {
+        return !hiddenChunkMessages.contains(uuid);
+    }
+
+    private String formatAgo(long timestamp) {
+        long diff = Math.max(0, System.currentTimeMillis() - timestamp);
+        long minutes = diff / 60000;
+        if (minutes < 1) return "just now";
+        if (minutes < 60) return minutes + "m ago";
+        long hours = minutes / 60;
+        if (hours < 24) return hours + "h ago";
+        long days = hours / 24;
+        return days + "d ago";
+    }
+}

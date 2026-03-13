@@ -1,7 +1,7 @@
 name: VisualClaims
-main: com.example.visualclaims.VisualClaims
+main: io.github.e1ixyz.visualclaims.VisualClaims
 version: 1.0.0
-api-version: 1.20
+api-version: 1.21
 depend: [dynmap]
 author: e1ixyz
 
