@@ -1,6 +1,6 @@
 ## VisualClaims
 
-VisualClaims is a Paper/Spigot plugin that lets players found towns, invite friends, visually claim chunks (no block protection), and see their borders rendered live on Dynmap. It combines lightweight gameplay commands with persistent storage and colourful map overlays so servers can offer simple land visualization without heavy setup.
+VisualClaims is a Paper/Spigot plugin that lets players found towns, invite friends, visually claim chunks, and see their borders rendered live on Dynmap. It includes optional lightweight claim protection (fire/lava/TNT controls) and keeps setup simple with JSON-backed persistence.
 
 ### Highlights
 - Found a town, invite/join friends, view members, and manage alliances between towns.
@@ -14,10 +14,11 @@ VisualClaims is a Paper/Spigot plugin that lets players found towns, invite frie
 - Store towns as JSON on disk for safe restarts and easy editing.
 - Simple permission scheme with an admin bypass for moderators and test servers.
 - (Experimental) Playtime-based claim caps with `/claimlimit` visibility and admin bonuses.
+- Safeguards: town names must be unique and scoreboard/sidebar lines are clamped to Bukkit-safe lengths.
 
 ### Requirements
-- Java 17 or newer.
-- Paper or Spigot server 1.20+ (API version 1.20, tested against Paper 1.21.8).
+- Java 21 or newer for Paper/Spigot 1.21.11 servers.
+- Paper or Spigot server 1.21.11+ (plugin `api-version` is 1.21, built against `paper-api 1.21.11-R0.1-SNAPSHOT`).
 - Dynmap installed and enabled (the plugin declares a hard dependency and will not start without it).
 
 ## Getting Started

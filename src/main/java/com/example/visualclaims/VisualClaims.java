@@ -1,6 +1,7 @@
 package com.example.visualclaims;
 
 import org.bukkit.Bukkit;
+import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class VisualClaims extends JavaPlugin {
@@ -32,41 +33,41 @@ public class VisualClaims extends JavaPlugin {
 
         // Register command handler
         CommandHandler handler = new CommandHandler(this, townManager);
-        getCommand("createtown").setExecutor(handler);
-        getCommand("deletetown").setExecutor(handler);
-        getCommand("claimchunk").setExecutor(handler);
-        getCommand("unclaim").setExecutor(handler);       // ✅ Added
-        getCommand("unclaimoutpost").setExecutor(handler);
-        getCommand("autoclaim").setExecutor(handler);
-        getCommand("autounclaim").setExecutor(handler);
-        getCommand("settownname").setExecutor(handler);
-        getCommand("settowncolor").setExecutor(handler);
-        getCommand("settowndesc").setExecutor(handler);
-        getCommand("setcapital").setExecutor(handler);
-        getCommand("claiminfo").setExecutor(handler);     // ✅ Added
-        getCommand("claimhistory").setExecutor(handler);
-        getCommand("claim").setExecutor(handler);         // ✅ Added (claim help)
-        getCommand("claimlimit").setExecutor(handler);    // Experimental limit/info
-        getCommand("adjustclaims").setExecutor(handler);  // Admin bonus adjustments
-        getCommand("transferoutpost").setExecutor(handler);
-        getCommand("towninvite").setExecutor(handler);
-        getCommand("jointown").setExecutor(handler);
-        getCommand("leavetown").setExecutor(handler);
-        getCommand("townmembers").setExecutor(handler);
-        getCommand("removemember").setExecutor(handler);
-        getCommand("towns").setExecutor(handler);
-        getCommand("towninfo").setExecutor(handler);
-        getCommand("autohistory").setExecutor(handler);
-        getCommand("contest").setExecutor(handler);
-        getCommand("alliance").setExecutor(handler);
-        getCommand("claimadmin").setExecutor(handler);
-        getCommand("admindeletetown").setExecutor(handler);
-        getCommand("leaderboard").setExecutor(handler);
-        getCommand("claimalerts").setExecutor(handler);
-        getCommand("silentvisit").setExecutor(handler);
-        getCommand("claimreload").setExecutor(handler);
-        getCommand("trimoutposts").setExecutor(handler);
-        getCommand("warmode").setExecutor(handler);
+        registerCommand("createtown", handler);
+        registerCommand("deletetown", handler);
+        registerCommand("claimchunk", handler);
+        registerCommand("unclaim", handler);
+        registerCommand("unclaimoutpost", handler);
+        registerCommand("autoclaim", handler);
+        registerCommand("autounclaim", handler);
+        registerCommand("settownname", handler);
+        registerCommand("settowncolor", handler);
+        registerCommand("settowndesc", handler);
+        registerCommand("setcapital", handler);
+        registerCommand("claiminfo", handler);
+        registerCommand("claimhistory", handler);
+        registerCommand("claim", handler);
+        registerCommand("claimlimit", handler);
+        registerCommand("adjustclaims", handler);
+        registerCommand("transferoutpost", handler);
+        registerCommand("towninvite", handler);
+        registerCommand("jointown", handler);
+        registerCommand("leavetown", handler);
+        registerCommand("townmembers", handler);
+        registerCommand("removemember", handler);
+        registerCommand("towns", handler);
+        registerCommand("towninfo", handler);
+        registerCommand("autohistory", handler);
+        registerCommand("contest", handler);
+        registerCommand("alliance", handler);
+        registerCommand("claimadmin", handler);
+        registerCommand("admindeletetown", handler);
+        registerCommand("leaderboard", handler);
+        registerCommand("claimalerts", handler);
+        registerCommand("silentvisit", handler);
+        registerCommand("claimreload", handler);
+        registerCommand("trimoutposts", handler);
+        registerCommand("warmode", handler);
 
         // Move listener
         moveListener = new MoveListener(this, townManager);
@@ -95,4 +96,13 @@ public class VisualClaims extends JavaPlugin {
     public TownManager getTownManager() { return townManager; }
     public MoveListener getMoveListener() { return moveListener; }
     public CombatListener getCombatListener() { return combatListener; }
+
+    private void registerCommand(String name, CommandHandler handler) {
+        PluginCommand command = getCommand(name);
+        if (command == null) {
+            getLogger().severe("Missing command registration in plugin.yml: " + name);
+            return;
+        }
+        command.setExecutor(handler);
+    }
 }

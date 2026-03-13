@@ -349,6 +349,10 @@ public class CommandHandler implements CommandExecutor {
             return true;
         }
         Town t = tOpt.get();
+        if (towns.isTownNameTaken(newName, t.getOwner())) {
+            p.sendMessage("§cThat town name is already taken.");
+            return true;
+        }
         t.setName(newName);
         towns.saveTown(t);
         towns.refreshTownAreas(t);

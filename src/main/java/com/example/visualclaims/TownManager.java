@@ -182,8 +182,24 @@ public class TownManager {
         return Optional.empty();
     }
 
+    public boolean isTownNameTaken(String name) {
+        return isTownNameTaken(name, null);
+    }
+
+    public boolean isTownNameTaken(String name, UUID excludeOwner) {
+        if (name == null || name.isBlank()) return false;
+        String target = name.trim().toLowerCase(Locale.ROOT);
+        for (Town t : townsByOwner.values()) {
+            if (t == null || t.getName() == null) continue;
+            if (excludeOwner != null && excludeOwner.equals(t.getOwner())) continue;
+            if (t.getName().trim().toLowerCase(Locale.ROOT).equals(target)) return true;
+        }
+        return false;
+    }
+
     public boolean createTown(UUID owner, String name, VanillaColor color, String world) {
         if (townsByMember.containsKey(owner)) return false;
+        if (isTownNameTaken(name, null)) return false;
         Town t = new Town(owner, name, world, color.name());
         townsByOwner.put(owner, t);
         indexTown(t);
@@ -1051,6 +1067,10 @@ public class TownManager {
         townsByOwner.clear();
         townsByChunkId.clear();
         townsByMember.clear();
+        pendingInvites.clear();
+        pendingAllianceInvites.clear();
+        pendingContestConfirmations.clear();
+        pendingRpsByContest.clear();
         File[] files = townsDir.listFiles((d, name) -> name.endsWith(".json"));
         if (files != null) {
             for (File f : files) {
@@ -1963,6 +1983,7 @@ public class TownManager {
     public void refreshLeaderboardScoreboard() {
         ScoreboardManager mgr = Bukkit.getScoreboardManager();
         if (mgr == null) return;
+        leaderboardBoards.keySet().removeIf(uuid -> Bukkit.getPlayer(uuid) == null);
 
         List<Town> killsTop = topByKills(3);
         List<Town> claimsTop = topByClaims(3);
@@ -2084,7 +2105,15 @@ public class TownManager {
 
     private String uniqueLine(String line, int index) {
         ChatColor suffix = SCOREBOARD_SUFFIXES[index % SCOREBOARD_SUFFIXES.length];
-        return line + suffix;
+        String base = line == null ? "" : line;
+        int maxBaseLength = 40 - suffix.toString().length();
+        if (base.length() > maxBaseLength) {
+            base = base.substring(0, maxBaseLength);
+            if (base.endsWith(String.valueOf(ChatColor.COLOR_CHAR))) {
+                base = base.substring(0, base.length() - 1);
+            }
+        }
+        return base + suffix;
     }
 
     private String townLabel(Town t) {
